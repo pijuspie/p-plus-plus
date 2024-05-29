@@ -1,5 +1,8 @@
-var a = 24;
-var b = 36;
+var x = 24;
+var y = 36;
+
+var a = x;
+var b = y;
 
 while (a > 0 and b > 0) {
     if (b > a) {
@@ -12,3 +15,4 @@ while (a > 0 and b > 0) {
 }
 
 print b;
+print x * y / b;
