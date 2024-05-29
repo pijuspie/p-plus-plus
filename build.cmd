@@ -1,0 +1,1 @@
+g++ -static -o p++ src/*.cpp
