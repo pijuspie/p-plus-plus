@@ -1,6 +1,7 @@
 #include <iostream>
 #include "vm.h"
 #include "compiler.h"
+#include "object.h"
 
 VM global;
 

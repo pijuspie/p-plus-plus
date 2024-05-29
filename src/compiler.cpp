@@ -1,6 +1,7 @@
 #include <iostream>
 #include "compiler.h"
 #include "value.h"
+#include "object.h"
 
 enum Precedence {
     PREC_NONE,

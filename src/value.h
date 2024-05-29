@@ -1,32 +1,12 @@
 #ifndef value_h
 #define value_h
 
-#include "chunk.h"
+typedef struct Obj Obj;
+typedef struct ObjString ObjString;
 
 enum ObjType {
     OBJ_STRING,
     OBJ_FUNCTION,
-};
-
-struct Obj {
-    ObjType type;
-    Obj* next;
-    Obj(ObjType type, Obj* next);
-};
-
-struct ObjString {
-    Obj obj;
-    std::string string;
-    ObjString(const std::string& string, Obj* next);
-};
-
-struct ObjFunction {
-    Obj obj;
-    int arity = 0;
-    Chunk chunk;
-    std::string name;
-
-    ObjFunction::ObjFunction(const std::string& name, Obj* next);
 };
 
 enum ValueType {
