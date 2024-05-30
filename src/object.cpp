@@ -5,18 +5,22 @@ Obj::Obj(ObjType type, Obj* next) : type(type), next(next) {}
 
 ObjString::ObjString(const std::string& string, Obj* next) : string(string), obj(Obj(OBJ_STRING, next)) {}
 
-ObjFunction::ObjFunction(const std::string& name, Obj* next) : name(name), obj(Obj(OBJ_FUNCTION, next)) {}
+ObjFunction::ObjFunction(Obj* next) : obj(Obj(OBJ_FUNCTION, next)) {}
 
 bool Value::isString() {
     return type == VAL_OBJ && as.obj->type == OBJ_STRING;
 }
 
-ObjType Value::getObjType() {
-    return as.obj->type;
+bool Value::isFunction() {
+    return type == VAL_OBJ && as.obj->type == OBJ_FUNCTION;
 }
 
 Obj* Value::getObj() {
     return as.obj;
+}
+
+ObjType Value::getObjType() {
+    return as.obj->type;
 }
 
 ObjString* Value::getObjString() {
@@ -27,6 +31,10 @@ std::string Value::getString() {
     return getObjString()->string;
 }
 
+ObjFunction* Value::getObjFunction() {
+    return (ObjFunction*)as.obj;
+}
+
 void Value::print() {
     switch (type) {
     case VAL_BOOL: std::cout << (as.boolean ? "true" : "false"); break;
@@ -35,6 +43,11 @@ void Value::print() {
     case VAL_OBJ:
         switch (as.obj->type) {
         case OBJ_STRING: std::cout << getString(); break;
+        case OBJ_FUNCTION:
+            std::cout << "<fn " << getObjFunction()->name << ">";
+            break;
         }
+
     }
+
 }

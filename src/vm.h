@@ -11,7 +11,7 @@ enum class InterpretResult {
 
 class VM {
 private:
-    Chunk chunk;
+    ObjFunction* fn;
     std::vector<uint8_t>::iterator ip;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;

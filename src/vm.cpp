@@ -12,8 +12,8 @@ InterpretResult interpret(std::string& source) {
 void VM::runtimeError(const std::string& message) {
     std::cerr << message << std::endl;
 
-    int instruction = ip - chunk.code.begin() - 1;
-    int line = chunk.lines[instruction];
+    int instruction = ip - fn->chunk.code.begin() - 1;
+    int line = fn->chunk.lines[instruction];
     std::cerr << "[line " << line << "] in script" << std::endl;
     stack.clear();
 }
@@ -55,7 +55,7 @@ uint16_t VM::readShort() {
 }
 
 Value VM::readConstant() {
-    return chunk.constants[readByte()];
+    return fn->chunk.constants[readByte()];
 }
 
 bool valuesEqual(Value a, Value b) {
@@ -76,7 +76,7 @@ bool isFalsey(Value value) {
 InterpretResult VM::run() {
     for (;;) {
         uint8_t instruction = readByte();
-        // std::cout << (int)instruction << std::endl;
+        std::cout << (int)instruction << std::endl;
         switch (instruction) {
         case OP_RETURN:
             return InterpretResult::ok;
@@ -222,14 +222,13 @@ InterpretResult VM::run() {
 }
 
 InterpretResult VM::interpret(std::string& source) {
-    chunk = Chunk();
+    fn = compile(source, objects);
 
-    Compiler compiler;
-    if (!compile(source, chunk, objects, compiler)) {
+    if (fn == nullptr) {
         return InterpretResult::compileError;
     }
 
-    ip = chunk.code.begin();
+    ip = fn->chunk.code.begin();
     InterpretResult result = run();
 
     //freeObjects();

@@ -23,7 +23,7 @@ struct ObjFunction {
     Chunk chunk;
     std::string name;
 
-    ObjFunction(const std::string& name, Obj* next);
+    ObjFunction(Obj* next);
 };
 
 #endif

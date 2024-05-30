@@ -3,6 +3,8 @@
 #include "value.h"
 #include "object.h"
 
+Local::Local(Token name, int depth) : name(name), depth(depth) {}
+
 enum Precedence {
     PREC_NONE,
     PREC_ASSIGNMENT,
@@ -30,7 +32,6 @@ struct ParseRule {
 class Parser {
 private:
     Scanner scanner;
-    Chunk& chunk;
     Obj* objects;
     Compiler& compiler;
 
@@ -38,6 +39,10 @@ private:
     Token previous;
     bool hadError = false;
     bool panicMode = false;
+
+    Chunk& getChunk() {
+        return compiler.function->chunk;
+    }
 
     void errorAtCurrent(const std::string& message) {
         errorAt(&current, message);
@@ -93,8 +98,8 @@ private:
     }
 
     void emitByte(uint8_t byte) {
-        chunk.code.push_back(byte);
-        chunk.lines.push_back(previous.line);
+        getChunk().code.push_back(byte);
+        getChunk().lines.push_back(previous.line);
     }
 
     void emitBytes(uint8_t byte1, uint8_t byte2) {
@@ -105,7 +110,7 @@ private:
     void emitLoop(int loopStart) {
         emitByte(OP_LOOP);
 
-        int offset = chunk.code.size() - loopStart + 2;
+        int offset = getChunk().code.size() - loopStart + 2;
         if (offset > 65535) error("Loop body too large.");
 
         emitByte((offset >> 8) & 0xff);
@@ -116,7 +121,7 @@ private:
         emitByte(instruction);
         emitByte(0xff);
         emitByte(0xff);
-        return chunk.code.size() - 2;
+        return getChunk().code.size() - 2;
     }
 
     void emitConstant(Value value) {
@@ -124,19 +129,19 @@ private:
     }
 
     void patchJump(int offset) {
-        int jump = chunk.code.size() - offset - 2;
+        int jump = getChunk().code.size() - offset - 2;
 
         if (jump > 65535) {
             error("Too much code to jump over.");
         }
 
-        chunk.code[offset] = (jump >> 8) & 0xff;
-        chunk.code[offset + 1] = jump & 0xff;
+        getChunk().code[offset] = (jump >> 8) & 0xff;
+        getChunk().code[offset + 1] = jump & 0xff;
     }
 
     uint8_t makeConstant(Value value) {
-        chunk.constants.push_back(value);
-        int constant = chunk.constants.size() - 1;
+        getChunk().constants.push_back(value);
+        int constant = getChunk().constants.size() - 1;
 
         if (constant > 255) {
             error("Too many constants in one chunk.");
@@ -231,7 +236,7 @@ private:
 
         consume(TOKEN_SEMICOLON, "Expect ';'.");
 
-        int loopStart = chunk.code.size();
+        int loopStart = getChunk().code.size();
         int exitJump = -1;
         if (!match(TOKEN_SEMICOLON)) {
             expression();
@@ -243,7 +248,7 @@ private:
 
         if (!match(TOKEN_RIGHT_PAREN)) {
             int bodyJump = emitJump(OP_JUMP);
-            int incrementStart = chunk.code.size();
+            int incrementStart = getChunk().code.size();
             expression();
             emitByte(OP_POP);
             consume(TOKEN_RIGHT_PAREN, "Expect ')' after for clauses.");
@@ -265,7 +270,7 @@ private:
     }
 
     void whileStatement() {
-        int loopStart = chunk.code.size();
+        int loopStart = getChunk().code.size();
         consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
         expression();
         consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
@@ -517,10 +522,7 @@ private:
             return;
         }
 
-        Local local;
-        local.name = name;
-        local.depth = -1;
-        compiler.locals.push_back(local);
+        compiler.locals.push_back(Local(name, -1));
     }
 
     void declareVariable() {
@@ -576,9 +578,9 @@ private:
     }
 
 public:
-    Parser(const std::string& source, Chunk& chunk, Obj* objects, Compiler& compiler) : scanner(Scanner(source)), chunk(chunk), objects(objects), compiler(compiler) {}
+    Parser(const std::string& source, Compiler& compiler, Obj* objects) : scanner(Scanner(source)), compiler(compiler), objects(objects) {}
 
-    bool compile() {
+    ObjFunction* compile() {
         advance();
 
         while (!match(TOKEN_EOF)) {
@@ -587,11 +589,20 @@ public:
 
         consume(TOKEN_EOF, "Expect end of expression.");
         emitByte(OP_RETURN);
-        return !hadError;
+        return hadError ? nullptr : compiler.function;
     }
 };
 
-bool compile(const std::string& source, Chunk& chunk, Obj* objects, Compiler& compiler) {
-    Parser parser(source, chunk, objects, compiler);
+ObjFunction* compile(const std::string& source, Obj* objects) {
+    Compiler compiler;
+    compiler.function = new ObjFunction(objects);
+
+    std::string name = "";
+    Token token;
+    token.start = name.begin();
+    token.end = name.end();
+    compiler.locals.push_back(Local(token, 0));
+
+    Parser parser(source, compiler, objects);
     return parser.compile();
 }

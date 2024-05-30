@@ -3,6 +3,7 @@
 
 typedef struct Obj Obj;
 typedef struct ObjString ObjString;
+typedef struct ObjFunction ObjFunction;
 
 enum ObjType {
     OBJ_STRING,
@@ -30,6 +31,7 @@ struct Value {
     bool isNumber();
     bool isObj();
     bool isString();
+    bool isFunction();
     bool isNil();
 
     bool getBool();
@@ -38,6 +40,7 @@ struct Value {
     ObjType getObjType();
     ObjString* getObjString();
     std::string getString();
+    ObjFunction* getObjFunction();
 
     void print();
 };

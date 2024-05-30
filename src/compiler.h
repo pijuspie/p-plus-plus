@@ -8,13 +8,23 @@
 struct Local {
     Token name;
     int depth;
+
+    Local(Token name, int depth);
+};
+
+enum FunctionType {
+    TYPE_FUNCTION,
+    TYPE_SCRIPT
 };
 
 struct Compiler {
+    ObjFunction* function = nullptr;
+    FunctionType type = TYPE_SCRIPT;
+
     std::vector<Local> locals;
     int scopeDepth = 0;
 };
 
-bool compile(const std::string& source, Chunk& chunk, Obj* objects, Compiler& compiler);
+ObjFunction* compile(const std::string& source, Obj* objects);
 
 #endif 
