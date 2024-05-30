@@ -29,7 +29,7 @@ a = a + 1;
 var d = a * b;
 ```
 
-#### Flow control
+#### Control Flow
 
 ```
 var a = 15;
@@ -59,7 +59,7 @@ print a;
 
 ## Examples
 
-Greatest common divider and lowest common multiple
+Greatest common divider and lowest common multiple:
 
 ```
 p++ examples/gcd-lcm.p
