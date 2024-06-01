@@ -77,7 +77,7 @@ bool isFalsey(Value value) {
 InterpretResult VM::run() {
     for (;;) {
         uint8_t instruction = readByte();
-        std::cout << (int)instruction << std::endl;
+        //std::cout << (int)instruction << std::endl;
         switch (instruction) {
         case OP_RETURN:
             return InterpretResult::ok;
@@ -239,7 +239,9 @@ InterpretResult VM::interpret(std::string& source) {
 
     stack.push_back(Value(*fn));
     ip = fn->chunk.code.begin();
+
     InterpretResult result = run();
+    stack.pop_back();
 
     //freeObjects();
     return result;

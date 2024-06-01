@@ -538,7 +538,7 @@ private:
                 break;
             }
 
-            if (previous.start == local.name.start) {
+            if (std::string(previous.start, previous.end) == std::string(local.name.start, local.name.end)) {
                 error("Already a variable with this name in this scope.");
             }
         }

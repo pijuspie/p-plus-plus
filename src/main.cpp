@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include "vm.h"
 
@@ -25,20 +26,16 @@ int runFile(const char* path) {
         return 74;
     }
 
-    std::string source;
-    file.seekg(0, std::ios::end);
-    source.resize(file.tellg());
 
-    file.seekg(0, std::ios::beg);
-    file.read(&source[0], source.size());
+    std::stringstream buffer;
+    buffer << file.rdbuf();
     file.close();
+    std::string source = buffer.str();
 
     switch (interpret(source)) {
     case InterpretResult::compileError:
-        std::cout << "compile" << std::endl;
         return 65;
     case InterpretResult::runtimeError:
-        std::cout << "runtime" << std::endl;
         return 70;
     }
     return 0;
