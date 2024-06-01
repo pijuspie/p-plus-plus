@@ -2,39 +2,15 @@
 
 const std::string UnexpectedCharacter = "Unexpected character.";
 const std::string UnterminatedString = "Unterminated string.";
+const std::string UnterminatedComment = "Unterminated comment.";
 
-int tokenTypeToInt(TokenType type) {
-    return static_cast<std::underlying_type<TokenType>::type>(type);
-}
+Token::Token() {}
 
-Scanner::Scanner(const std::string& source) : source(source) {
-    start = source.begin();
-    current = source.begin();
-}
-
-bool Scanner::isAtEnd() {
-    return current == source.end() || *current == '\0';
-}
-
-char Scanner::advance() {
-    current++;
-    return current[-1];
-}
-
-char Scanner::peek() {
-    return *current;
-}
-
-char Scanner::peekNext() {
-    if (isAtEnd()) return '\0';
-    return current[1];
-}
-
-bool Scanner::match(char expected) {
-    if (isAtEnd()) return false;
-    if (*current != expected) return false;
-    current++;
-    return true;
+Token::Token(TokenType type1, StringIterator start1, StringIterator end1, int line1) {
+    type = type1;
+    start = start1;
+    end = end1;
+    line = line1;
 }
 
 bool isAlpha(char c) {
@@ -45,57 +21,13 @@ bool isDigit(char c) {
     return c >= '0' && c <= '9';
 }
 
-Token Scanner::makeToken(TokenType type) {
-    Token token;
-    token.type = type;
-    token.start = start;
-    token.end = current;
-    token.line = line;
-    return token;
-}
-
-Token Scanner::errorToken(const std::string& message) {
-    Token token;
-    token.type = TOKEN_ERROR;
-    token.start = message.begin();
-    token.end = message.end();
-    token.line = line;
-    return token;
-}
-
-void Scanner::skipWhitespace() {
-    for (;;) {
-        char c = peek();
-        switch (c) {
-        case ' ':
-        case '\r':
-        case '\t':
-            advance();
-            break;
-        case '\n':
-            line++;
-            advance();
-            break;
-        case '/':
-            if (peekNext() == '/') {
-                while (peek() != '\n' && !isAtEnd()) advance();
-            } else {
-                return;
-            }
-            break;
-        default:
-            return;
-        }
-    }
-}
-
-TokenType Scanner::checkKeyword(int begin, std::string rest, TokenType type) {
-    if (current - start - begin != rest.size()) {
+TokenType checkKeyword(StringIterator begin, StringIterator end, std::string rest, TokenType type) {
+    if (end - begin != rest.size()) {
         return TOKEN_IDENTIFIER;
     }
 
     for (char c : rest) {
-        if (start[begin] != c) {
+        if (begin[0] != c) {
             return TOKEN_IDENTIFIER;
         }
         begin++;
@@ -104,99 +36,167 @@ TokenType Scanner::checkKeyword(int begin, std::string rest, TokenType type) {
     return type;
 }
 
-TokenType Scanner::identifierType() {
+TokenType identifierType(StringIterator start, StringIterator end) {
     switch (start[0]) {
-    case 'a': return checkKeyword(1, "nd", TOKEN_AND);
-    case 'c': return checkKeyword(1, "lass", TOKEN_CLASS);
-    case 'e': return checkKeyword(1, "lse", TOKEN_ELSE);
+    case 'a': return checkKeyword(start + 1, end, "nd", TOKEN_AND);
+    case 'c': return checkKeyword(start + 1, end, "lass", TOKEN_CLASS);
+    case 'e': return checkKeyword(start + 1, end, "lse", TOKEN_ELSE);
     case 'f':
-        if (current - start > 1) {
+        if (start + 1 != end) {
             switch (start[1]) {
-            case 'a': return checkKeyword(2, "lse", TOKEN_FALSE);
-            case 'o': return checkKeyword(2, "r", TOKEN_FOR);
-            case 'u': return checkKeyword(2, "n", TOKEN_FUN);
+            case 'a': return checkKeyword(start + 2, end, "lse", TOKEN_FALSE);
+            case 'o': return checkKeyword(start + 2, end, "r", TOKEN_FOR);
+            case 'u': return checkKeyword(start + 2, end, "n", TOKEN_FUN);
             }
         }
         break;
-    case 'i': return checkKeyword(1, "f", TOKEN_IF);
-    case 'n': return checkKeyword(1, "il", TOKEN_NIL);
-    case 'o': return checkKeyword(1, "r", TOKEN_OR);
-    case 'p': return checkKeyword(1, "rint", TOKEN_PRINT);
-    case 'r': return checkKeyword(1, "eturn", TOKEN_RETURN);
-    case 's': return checkKeyword(1, "uper", TOKEN_SUPER);
+    case 'i': return checkKeyword(start + 1, end, "f", TOKEN_IF);
+    case 'n': return checkKeyword(start + 1, end, "il", TOKEN_NIL);
+    case 'o': return checkKeyword(start + 1, end, "r", TOKEN_OR);
+    case 'p': return checkKeyword(start + 1, end, "rint", TOKEN_PRINT);
+    case 'r': return checkKeyword(start + 1, end, "eturn", TOKEN_RETURN);
+    case 's': return checkKeyword(start + 1, end, "uper", TOKEN_SUPER);
     case 't':
-        if (current - start > 1) {
+        if (start + 1 != end) {
             switch (start[1]) {
-            case 'h': return checkKeyword(2, "is", TOKEN_THIS);
-            case 'r': return checkKeyword(2, "ue", TOKEN_TRUE);
+            case 'h': return checkKeyword(start + 2, end, "is", TOKEN_THIS);
+            case 'r': return checkKeyword(start + 2, end, "ue", TOKEN_TRUE);
             }
         }
         break;
-    case 'v': return checkKeyword(1, "ar", TOKEN_VAR);
-    case 'w': return checkKeyword(1, "hile", TOKEN_WHILE);
+    case 'v': return checkKeyword(start + 1, end, "ar", TOKEN_VAR);
+    case 'w': return checkKeyword(start + 1, end, "hile", TOKEN_WHILE);
     }
 
     return TOKEN_IDENTIFIER;
 }
 
-Token Scanner::identifier() {
-    while (isAlpha(peek()) || isDigit(peek())) advance();
-    return makeToken(identifierType());
+Token identifier(StringIterator& current, StringIterator end, int line) {
+    StringIterator start = current;
+    while (isAlpha(current[0]) || isDigit(current[0])) current++;
+    return Token(identifierType(start, current), start, current, line);
 }
 
-Token Scanner::number() {
-    while (isDigit(peek())) advance();
+Token number(StringIterator& current, StringIterator end, int line) {
+    StringIterator start = current;
 
-    if (peek() == '.' && isDigit(peekNext())) {
-        advance();
-        while (isDigit(peek())) advance();
+    while (isDigit(current[0])) current++;
+
+    if (current[0] == '.' && current + 1 != end && isDigit(current[1])) {
+        current++;
+        while (isDigit(current[0])) current++;
     }
 
-    return makeToken(TOKEN_NUMBER);
+    return Token(TOKEN_NUMBER, start, current, line);
 }
 
-Token Scanner::string() {
-    while (peek() != '"' && !isAtEnd()) {
-        if (peek() == '\n') line++;
-        advance();
+Token string(StringIterator& current, StringIterator end, int& line) {
+    StringIterator start = current;
+
+    while (current != end && current[0] != '"') {
+        if (current[0] == '\n') line++;
+        current++;
     }
 
-    if (isAtEnd()) return errorToken(UnterminatedString);
+    if (current == end) {
+        return Token(TOKEN_ERROR, UnterminatedString.begin(), UnterminatedString.end(), line);
+    }
 
-    advance();
-    return makeToken(TOKEN_STRING);
+    current++;
+    return Token(TOKEN_STRING, start, current, line);
 }
 
-Token Scanner::scanToken() {
-    skipWhitespace();
+Token character(StringIterator& current, StringIterator end, int line) {
+    StringIterator start = current;
+    current++;
 
-    start = current;
-    if (isAtEnd()) {
-        return makeToken(TOKEN_EOF);
+    switch (*start) {
+    case '(': return Token(TOKEN_LEFT_PAREN, start, current, line);
+    case ')': return Token(TOKEN_RIGHT_PAREN, start, current, line);
+    case '{': return Token(TOKEN_LEFT_BRACE, start, current, line);
+    case '}': return Token(TOKEN_RIGHT_BRACE, start, current, line);
+    case ';': return Token(TOKEN_SEMICOLON, start, current, line);
+    case ',': return Token(TOKEN_COMMA, start, current, line);
+    case '.': return Token(TOKEN_DOT, start, current, line);
+    case '-': return Token(TOKEN_MINUS, start, current, line);
+    case '+': return Token(TOKEN_PLUS, start, current, line);
+    case '/': return Token(TOKEN_SLASH, start, current, line);
+    case '*': return Token(TOKEN_STAR, start, current, line);
+    case '!':
+        if (current != end && current[0] == '=') {
+            current++;
+            return Token(TOKEN_BANG_EQUAL, start, current, line);
+        } else return Token(TOKEN_BANG, start, current, line);
+    case '=':
+        if (current != end && current[0] == '=') {
+            current++;
+            return Token(TOKEN_EQUAL_EQUAL, start, current, line);
+        } else return Token(TOKEN_EQUAL, start, current, line);
+    case '<':
+        if (current != end && current[0] == '=') {
+            current++;
+            return Token(TOKEN_LESS_EQUAL, start, current, line);
+        } else return Token(TOKEN_LESS, start, current, line);
+    case '>':
+        if (current != end && current[0] == '=') {
+            current++;
+            return Token(TOKEN_GREATER_EQUAL, start, current, line);
+        } else return Token(TOKEN_GREATER, start, current, line);
     }
 
-    char c = advance();
-    if (isAlpha(c)) return identifier();
-    if (isDigit(c)) return number();
+    return Token(TOKEN_ERROR, UnexpectedCharacter.begin(), UnexpectedCharacter.end(), line);
+}
 
-    switch (c) {
-    case '(': return makeToken(TOKEN_LEFT_PAREN);
-    case ')': return makeToken(TOKEN_RIGHT_PAREN);
-    case '{': return makeToken(TOKEN_LEFT_BRACE);
-    case '}': return makeToken(TOKEN_RIGHT_BRACE);
-    case ';': return makeToken(TOKEN_SEMICOLON);
-    case ',': return makeToken(TOKEN_COMMA);
-    case '.': return makeToken(TOKEN_DOT);
-    case '-': return makeToken(TOKEN_MINUS);
-    case '+': return makeToken(TOKEN_PLUS);
-    case '/': return makeToken(TOKEN_SLASH);
-    case '*': return makeToken(TOKEN_STAR);
-    case '!': return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-    case '=': return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
-    case '<': return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-    case '>': return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
-    case '"': return string();
+Token scanToken(StringIterator& current, StringIterator end, int& line) {
+    while (current != end) {
+        if (current[0] == ' ' || current[0] == '\r' || current[0] == '\t') {
+            current++;
+            continue;
+        } else if (current[0] == '\n') {
+            current++;
+            line++;
+            continue;
+        }
+
+        if (current[0] == '/' && current + 1 != end) {
+            if (current[1] == '/') {
+                current += 2;
+                while (current != end && current[0] != '\n') current++;
+                continue;
+            }
+
+            if (current[1] == '*') {
+                current += 2;
+
+                if (current == end || current + 1 == end) {
+                    return Token(TOKEN_ERROR, UnterminatedComment.begin(), UnterminatedComment.end(), line);
+                }
+
+                while (current + 1 != end && current[0] != '*' && current[1] != '/') current++;
+
+                if (current[0] != '*' && current[1] != '/') {
+                    return Token(TOKEN_ERROR, UnterminatedComment.begin(), UnterminatedComment.end(), line);
+                }
+
+                current += 2;
+                continue;
+            }
+        }
+
+        if (isAlpha(current[0])) {
+            return identifier(current, end, line);
+        }
+
+        if (isDigit(current[0])) {
+            return number(current, end, line);
+        }
+
+        if (current[0] == '"') {
+            return string(current, end, line);
+        }
+
+        return character(current, end, line);
     }
 
-    return errorToken(UnexpectedCharacter);
+    return Token(TOKEN_EOF, current, end, line);
 }

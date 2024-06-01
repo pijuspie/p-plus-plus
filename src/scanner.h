@@ -3,6 +3,8 @@
 
 #include <string>
 
+typedef std::string::const_iterator StringIterator;
+
 enum TokenType {
     TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,
     TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE,
@@ -20,42 +22,16 @@ enum TokenType {
     TOKEN_ERROR, TOKEN_EOF
 };
 
-int tokenTypeToInt(TokenType type);
-
 struct Token {
     TokenType type;
-    std::string::const_iterator start;
-    std::string::const_iterator end;
+    StringIterator start;
+    StringIterator end;
     int line;
+
+    Token();
+    Token(TokenType type, StringIterator start, StringIterator end, int line);
 };
 
-class Scanner {
-private:
-    const std::string& source;
-    std::string::const_iterator start;
-    std::string::const_iterator current;
-    int line = 1;
-
-    bool isAtEnd();
-    char advance();
-    char peek();
-    char peekNext();
-    bool match(char expected);
-
-    Token makeToken(TokenType type);
-    Token errorToken(const std::string& message);
-    void skipWhitespace();
-
-    TokenType checkKeyword(int begin, std::string rest, TokenType type);
-    TokenType identifierType();
-
-    Token identifier();
-    Token number();
-    Token string();
-
-public:
-    Scanner(const std::string& source);
-    Token scanToken();
-};
+Token scanToken(StringIterator& current, StringIterator end, int& line);
 
 #endif

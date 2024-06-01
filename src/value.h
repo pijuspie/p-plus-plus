@@ -1,6 +1,8 @@
 #ifndef value_h
 #define value_h
 
+#include <string>
+
 typedef struct Obj Obj;
 typedef struct ObjString ObjString;
 typedef struct ObjFunction ObjFunction;

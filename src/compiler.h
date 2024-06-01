@@ -1,9 +1,9 @@
 #ifndef compiler_h
 #define compiler_h
 
-#include <string>
 #include "chunk.h"
 #include "scanner.h"
+#include <string>
 
 struct Local {
     Token name;

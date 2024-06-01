@@ -1,8 +1,9 @@
 #ifndef chunk_h
 #define chunk_h
 
-#include <vector>
 #include "value.h"
+#include <vector>
+#include <stdint.h>
 
 enum OpCode {
     OP_RETURN,

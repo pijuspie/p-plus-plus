@@ -1,7 +1,7 @@
-#include <iostream>
 #include "compiler.h"
 #include "value.h"
 #include "object.h"
+#include <iostream>
 
 Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
@@ -31,9 +31,12 @@ struct ParseRule {
 
 class Parser {
 private:
-    Scanner scanner;
     Obj* objects;
     Compiler& compiler;
+
+    int line = 1;
+    StringIterator current_char;
+    StringIterator end_char;
 
     Token current;
     Token previous;
@@ -72,7 +75,7 @@ private:
         previous = current;
 
         for (;;) {
-            current = scanner.scanToken();
+            current = scanToken(current_char, end_char, line);
             if (current.type != TOKEN_ERROR) break;
             errorAtCurrent(std::string(current.start, current.end));
         }
@@ -578,7 +581,11 @@ private:
     }
 
 public:
-    Parser(const std::string& source, Compiler& compiler, Obj* objects) : scanner(Scanner(source)), compiler(compiler), objects(objects) {}
+    Parser(const std::string& source, Compiler& compiler, Obj* objects1) : compiler(compiler) {
+        current_char = source.begin();
+        end_char = source.end();
+        objects = objects1;
+    }
 
     ObjFunction* compile() {
         advance();
@@ -598,9 +605,7 @@ ObjFunction* compile(const std::string& source, Obj* objects) {
     compiler.function = new ObjFunction(objects);
 
     std::string name = "";
-    Token token;
-    token.start = name.begin();
-    token.end = name.end();
+    Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
     compiler.locals.push_back(Local(token, 0));
 
     Parser parser(source, compiler, objects);
