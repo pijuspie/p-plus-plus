@@ -1,7 +1,6 @@
 #include <iostream>
 #include "vm.h"
 #include "compiler.h"
-#include "object.h"
 
 VM global;
 
@@ -23,7 +22,8 @@ void VM::freeObjects() {
         Obj* next = objects->next;
 
         switch (objects->type) {
-        case OBJ_STRING: delete (ObjString*)objects; break;
+        case VAL_STRING: delete (ObjString*)objects; break;
+        case VAL_FUNCTION: delete (Function*)objects; break;
         }
 
         objects = next;
@@ -61,22 +61,23 @@ Value VM::readConstant() {
 bool valuesEqual(Value a, Value b) {
     if (a.type != b.type) return false;
     switch (a.type) {
-    case VAL_BOOL: return a.getBool() == b.getBool();
+    case VAL_BOOL: return a.as.boolean == b.as.boolean;
     case VAL_NIL: return true;
-    case VAL_NUMBER: return a.getNumber() == b.getNumber();
-    case VAL_OBJ: return a.getString() == b.getString();
+    case VAL_NUMBER: return a.as.number == b.as.number;
+    case VAL_STRING: return getString(a) == getString(b);
+    case VAL_FUNCTION: return getFunction(a).name == getFunction(b).name;
     default: return false;
     }
 }
 
 bool isFalsey(Value value) {
-    return value.isNil() || (value.isBool() && !value.getBool());
+    return value.type == VAL_NIL || (value.type == VAL_BOOL && !value.as.boolean);
 }
 
 InterpretResult VM::run() {
     for (;;) {
         uint8_t instruction = readByte();
-        //std::cout << (int)instruction << std::endl;
+        std::cout << (int)instruction << std::endl;
         switch (instruction) {
         case OP_RETURN:
             return InterpretResult::ok;
@@ -90,79 +91,79 @@ InterpretResult VM::run() {
         case OP_FALSE: push(false); break;
         case OP_EQUAL: push(valuesEqual(pop(), pop())); break;
         case OP_GREATER: {
-            if (!peek(0).isNumber() || !peek(1).isNumber()) {
+            if (peek(0).type != VAL_NUMBER || peek(1).type != VAL_NUMBER) {
                 runtimeError("Operands must be numbers.");
                 return InterpretResult::runtimeError;
             }
 
-            push(pop().getNumber() < pop().getNumber());
+            push(pop().as.number < pop().as.number);
             break;
         }
         case OP_LESS: {
-            if (!peek(0).isNumber() || !peek(1).isNumber()) {
+            if (peek(0).type != VAL_NUMBER || peek(1).type != VAL_NUMBER) {
                 runtimeError("Operands must be numbers.");
                 return InterpretResult::runtimeError;
             }
 
-            push(pop().getNumber() > pop().getNumber());
+            push(pop().as.number > pop().as.number);
             break;
         }
         case OP_NEGATE:
-            if (!peek(0).isNumber()) {
+            if (peek(0).type != VAL_NUMBER) {
                 runtimeError("Operand must be a number.");
                 return InterpretResult::runtimeError;
             }
-            push(-pop().getNumber());
+            push(-pop().as.number);
             break;
         case OP_ADD:
-            if (peek(0).isString() && peek(1).isString()) {
-                ObjString* b = pop().getObjString();
-                ObjString* a = pop().getObjString();
-                ObjString* result = new ObjString(a->string + b->string, objects);
+            if (peek(0).type == VAL_STRING && peek(1).type == VAL_STRING) {
+                std::string b = getString(pop());
+                std::string a = getString(pop());
+                ObjString* result = new ObjString(a + b, objects);
                 objects = (Obj*)result;
-                push((Obj*)result);
-            } else if (peek(0).isNumber() && peek(1).isNumber()) {
-                push(pop().getNumber() + pop().getNumber());
+                push(Value(*result));
+            } else if (peek(0).type == VAL_NUMBER && peek(1).type == VAL_NUMBER) {
+                push(pop().as.number + pop().as.number);
             } else {
+                std::cout << peek(0).type << " " << peek(1).type << std::endl;
                 runtimeError("Operands must be two numbers or two strings.");
                 return InterpretResult::runtimeError;
             }
             break;
         case OP_SUBTRACT: {
-            if (!peek(0).isNumber() || !peek(1).isNumber()) {
+            if (peek(0).type != VAL_NUMBER || peek(1).type != VAL_NUMBER) {
                 runtimeError("Operands must be numbers.");
                 return InterpretResult::runtimeError;
             }
 
-            push((pop().getNumber() - pop().getNumber()) * -1);
+            push((pop().as.number - pop().as.number) * -1);
             break;
         }
         case OP_MULTIPLY: {
-            if (!peek(0).isNumber() || !peek(1).isNumber()) {
+            if (peek(0).type != VAL_NUMBER || peek(1).type != VAL_NUMBER) {
                 runtimeError("Operands must be numbers.");
                 return InterpretResult::runtimeError;
             }
 
-            push(pop().getNumber() * pop().getNumber());
+            push(pop().as.number * pop().as.number);
             break;
         }
         case OP_DIVIDE: {
-            if (!peek(0).isNumber() || !peek(1).isNumber()) {
+            if (peek(0).type != VAL_NUMBER || peek(1).type != VAL_NUMBER) {
                 runtimeError("Operands must be numbers.");
                 return InterpretResult::runtimeError;
             }
 
-            push(1 / pop().getNumber() * pop().getNumber());
+            push(1 / pop().as.number * pop().as.number);
             break;
         }
         case OP_NOT: {
             Value value = pop();
-            push(value.isNil() || (value.isBool() && !value.getBool()));
+            push(isFalsey(value));
             break;
         }
         case OP_PRINT: {
-            pop().print();
-            std::cout << std::endl;
+            std::cout << stringify(pop()) << std::endl;
             break;
         }
         case OP_JUMP: {
@@ -181,7 +182,15 @@ InterpretResult VM::run() {
         }
         case OP_POP: pop(); break;
         case OP_DEFINE_GLOBAL: {
-            globals.insert({ readConstant().getObjString()->string, peek(0) });
+            std::string name = getString(readConstant());
+            std::unordered_map<std::string, Value>::iterator value = globals.find(name);
+
+            if (value != globals.end()) {
+                value->second = peek(0);
+            } else {
+                globals.insert({ name, peek(0) });
+            }
+
             pop();
             break;
         }
@@ -194,11 +203,11 @@ InterpretResult VM::run() {
             break;
         }
         case OP_GET_GLOBAL: {
-            ObjString* name = readConstant().getObjString();
-            std::unordered_map<std::string, Value>::iterator value = globals.find(name->string);
+            std::string name = getString(readConstant());
+            std::unordered_map<std::string, Value>::iterator value = globals.find(name);
 
             if (value == globals.end()) {
-                runtimeError("Undefined variable '" + name->string + "'.");
+                runtimeError("Undefined variable '" + name + "'.");
                 return InterpretResult::runtimeError;
             }
 
@@ -206,11 +215,11 @@ InterpretResult VM::run() {
             break;
         }
         case OP_SET_GLOBAL: {
-            ObjString* name = readConstant().getObjString();
-            std::unordered_map<std::string, Value>::iterator value = globals.find(name->string);
+            std::string name = getString(readConstant());
+            std::unordered_map<std::string, Value>::iterator value = globals.find(name);
 
             if (value == globals.end()) {
-                runtimeError("Undefined variable '" + name->string + "'.");
+                runtimeError("Undefined variable '" + name + "'.");
                 return InterpretResult::runtimeError;
             }
 
@@ -228,7 +237,7 @@ InterpretResult VM::interpret(std::string& source) {
         return InterpretResult::compileError;
     }
 
-    stack.push_back(Value((Obj*)fn));
+    stack.push_back(Value(*fn));
     ip = fn->chunk.code.begin();
     InterpretResult result = run();
 

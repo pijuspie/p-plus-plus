@@ -3,7 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
-#include "chunk.h"
+#include "value.h"
 
 enum class InterpretResult {
     ok, compileError, runtimeError
@@ -11,7 +11,7 @@ enum class InterpretResult {
 
 class VM {
 private:
-    ObjFunction* fn;
+    Function* fn;
     std::vector<uint8_t>::iterator ip;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;

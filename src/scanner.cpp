@@ -92,6 +92,7 @@ Token number(StringIterator& current, StringIterator end, int line) {
 
 Token string(StringIterator& current, StringIterator end, int& line) {
     StringIterator start = current;
+    current++;
 
     while (current != end && current[0] != '"') {
         if (current[0] == '\n') line++;

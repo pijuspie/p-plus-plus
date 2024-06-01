@@ -1,42 +1,61 @@
-#include <iostream>
 #include "value.h"
+#include <iostream>
 
-Value::Value(bool boolean) : type(VAL_BOOL) {
-    as.boolean = boolean;
+Obj::Obj(ValueType type1, Obj* next1) {
+    type = type1;
+    next = next1;
 }
 
-Value::Value(double number) : type(VAL_NUMBER) {
-    as.number = number;
+ObjString::ObjString(const std::string& string1, Obj* next) : obj(Obj(VAL_STRING, next)) {
+    string = string1;
 }
 
-Value::Value(Obj* obj) : type(VAL_OBJ) {
-    as.obj = obj;
+ObjString& getObjString(Value value) {
+    return *(ObjString*)value.as.object;
+}
+
+std::string& getString(Value value) {
+    return getObjString(value).string;
+}
+
+Function::Function(Obj* next) : obj(Obj(VAL_FUNCTION, next)) {}
+
+Function& getFunction(Value value) {
+    return *(Function*)value.as.object;
 }
 
 Value::Value() : type(VAL_NIL) {
     as.number = 0;
 };
 
-bool Value::isBool() {
-    return type == VAL_BOOL;
+Value::Value(bool boolean) {
+    type = VAL_BOOL;
+    as.boolean = boolean;
 }
 
-bool Value::isNumber() {
-    return type == VAL_NUMBER;
+Value::Value(double number) {
+    type = VAL_NUMBER;
+    as.number = number;
 }
 
-bool Value::isObj() {
-    return type == VAL_OBJ;
+Value::Value(ObjString& string) {
+    type = VAL_STRING;
+    as.object = (Obj*)&string;
 }
 
-bool Value::isNil() {
-    return type == VAL_NIL;
+Value::Value(Function& function) {
+    type = VAL_FUNCTION;
+    as.object = (Obj*)&function;
 }
 
-bool Value::getBool() {
-    return as.boolean;
-}
+std::string stringify(Value value) {
+    switch (value.type) {
+    case VAL_NIL: return "nil";
+    case VAL_BOOL: return (value.as.boolean ? "true" : "false");
+    case VAL_NUMBER: return std::to_string(value.as.number);
+    case VAL_STRING: return getString(value);
+    case VAL_FUNCTION: return "<fn " + getFunction(value).name + ">";
+    }
 
-double Value::getNumber() {
-    return as.number;
+    return "unexpected type";
 }

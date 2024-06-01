@@ -1,8 +1,8 @@
 #ifndef compiler_h
 #define compiler_h
 
-#include "chunk.h"
 #include "scanner.h"
+#include "value.h"
 #include <string>
 
 struct Local {
@@ -18,13 +18,13 @@ enum FunctionType {
 };
 
 struct Compiler {
-    ObjFunction* function = nullptr;
+    Function* function = nullptr;
     FunctionType type = TYPE_SCRIPT;
 
     std::vector<Local> locals;
     int scopeDepth = 0;
 };
 
-ObjFunction* compile(const std::string& source, Obj* objects);
+Function* compile(const std::string& source, Obj* objects);
 
 #endif 

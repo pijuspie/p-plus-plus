@@ -1,6 +1,5 @@
 #include "compiler.h"
 #include "value.h"
-#include "object.h"
 #include <iostream>
 
 Local::Local(Token name, int depth) : name(name), depth(depth) {}
@@ -355,7 +354,7 @@ private:
     void string(bool canAssign) {
         ObjString* value = new ObjString(std::string(previous.start + 1, previous.end - 1), objects);
         objects = (Obj*)value;
-        emitConstant((Obj*)value);
+        emitConstant(Value(*value));
     }
 
     void variable(bool canAssign) {
@@ -516,7 +515,7 @@ private:
     uint8_t identifierConstant(Token* name) {
         ObjString* value = new ObjString(std::string(previous.start, previous.end), objects);
         objects = (Obj*)value;
-        return makeConstant((Obj*)value);
+        return makeConstant(Value(*value));
     }
 
     void addLocal(Token name) {
@@ -587,7 +586,7 @@ public:
         objects = objects1;
     }
 
-    ObjFunction* compile() {
+    Function* compile() {
         advance();
 
         while (!match(TOKEN_EOF)) {
@@ -600,9 +599,9 @@ public:
     }
 };
 
-ObjFunction* compile(const std::string& source, Obj* objects) {
+Function* compile(const std::string& source, Obj* objects) {
     Compiler compiler;
-    compiler.function = new ObjFunction(objects);
+    compiler.function = new Function(objects);
 
     std::string name = "";
     Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
