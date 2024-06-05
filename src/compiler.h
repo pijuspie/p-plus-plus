@@ -18,11 +18,14 @@ enum FunctionType {
 };
 
 struct Compiler {
-    Function* function = nullptr;
-    FunctionType type = TYPE_SCRIPT;
+    Compiler* enclosing;
+    Function* function;
+    FunctionType type;
 
     std::vector<Local> locals;
     int scopeDepth = 0;
+
+    Compiler(Compiler* enclosing, FunctionType type, Obj* objects);
 };
 
 Function* compile(const std::string& source, Obj* objects);

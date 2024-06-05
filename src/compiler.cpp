@@ -4,6 +4,16 @@
 
 Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
+Compiler::Compiler(Compiler* enclosing1, FunctionType type1, Obj* objects) {
+    enclosing = enclosing1;
+    function = new Function(objects);
+    type = type1;
+
+    std::string name = "";
+    Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
+    locals.push_back(Local(token, 0));
+}
+
 enum Precedence {
     PREC_NONE,
     PREC_ASSIGNMENT,
@@ -31,7 +41,7 @@ struct ParseRule {
 class Parser {
 private:
     Obj* objects;
-    Compiler& compiler;
+    Compiler* compiler;
 
     int line = 1;
     StringIterator current_char;
@@ -43,7 +53,7 @@ private:
     bool panicMode = false;
 
     Chunk& getChunk() {
-        return compiler.function->chunk;
+        return compiler->function->chunk;
     }
 
     void errorAtCurrent(const std::string& message) {
@@ -154,7 +164,9 @@ private:
     }
 
     void declaration() {
-        if (match(TOKEN_VAR)) {
+        if (match(TOKEN_FUN)) {
+            funDeclaration();
+        } else if (match(TOKEN_VAR)) {
             varDeclaration();
         } else {
             statement();
@@ -163,6 +175,13 @@ private:
         if (panicMode) {
             synchronize();
         }
+    }
+
+    void funDeclaration() {
+        uint8_t global = parseVariable("Expect function name.");
+        markInitialized();
+        function(TYPE_FUNCTION);
+        defineVariable(global);
     }
 
     void varDeclaration() {
@@ -201,13 +220,13 @@ private:
     }
 
     void beginScope() {
-        compiler.scopeDepth++;
+        compiler->scopeDepth++;
     }
 
     void endScope() {
-        compiler.scopeDepth--;
-        while (compiler.locals.size() > 0 && compiler.locals[compiler.locals.size() - 1].depth > compiler.scopeDepth) {
-            compiler.locals.pop_back();
+        compiler->scopeDepth--;
+        while (compiler->locals.size() > 0 && compiler->locals[compiler->locals.size() - 1].depth > compiler->scopeDepth) {
+            compiler->locals.pop_back();
             emitByte(OP_POP);
         }
     }
@@ -218,6 +237,38 @@ private:
         }
 
         consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
+    }
+
+    void function(FunctionType type) {
+        Compiler current(compiler, type, objects);
+        compiler = &current;
+        if (type != TYPE_SCRIPT) {
+            compiler->function->name = std::string(previous.start, previous.end);
+        }
+
+        beginScope();
+
+        consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+        if (!check(TOKEN_RIGHT_PAREN)) {
+            do {
+                compiler->function->arity++;
+                if (compiler->function->arity > 255) {
+                    errorAtCurrent("Can't have more than 255 parameters.");
+                }
+                uint8_t constant = parseVariable("Expect parameter name.");
+                defineVariable(constant);
+            } while (match(TOKEN_COMMA));
+        }
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+        block();
+
+        emitByte(OP_NIL);
+        emitByte(OP_RETURN);
+
+        Function& fn = *compiler->function;
+        compiler = compiler->enclosing;
+        emitBytes(OP_CONSTANT, makeConstant(Value(fn)));
     }
 
     void printStatement() {
@@ -414,6 +465,11 @@ private:
         }
     }
 
+    void call(bool canAssign) {
+        uint8_t argCount = argumentList();
+        emitBytes(OP_CALL, argCount);
+    }
+
     void literal(bool canAssign) {
         switch (previous.type) {
         case TOKEN_FALSE: emitByte(OP_FALSE); break;
@@ -429,7 +485,7 @@ private:
     }
 
     ParseRule rules[40] = {
-        [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_NONE},
+        [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
@@ -501,7 +557,7 @@ private:
         consume(TOKEN_IDENTIFIER, errorMessage);
 
         declareVariable();
-        if (compiler.scopeDepth > 0) {
+        if (compiler->scopeDepth > 0) {
             return 0;
         }
 
@@ -509,7 +565,8 @@ private:
     }
 
     void markInitialized() {
-        compiler.locals[compiler.locals.size() - 1].depth = compiler.scopeDepth;
+        if (compiler->scopeDepth == 0) return;
+        compiler->locals[compiler->locals.size() - 1].depth = compiler->scopeDepth;
     }
 
     uint8_t identifierConstant(Token* name) {
@@ -519,22 +576,22 @@ private:
     }
 
     void addLocal(Token name) {
-        if (compiler.locals.size() == 256) {
+        if (compiler->locals.size() == 256) {
             error("Too many local variables in function.");
             return;
         }
 
-        compiler.locals.push_back(Local(name, -1));
+        compiler->locals.push_back(Local(name, -1));
     }
 
     void declareVariable() {
-        if (compiler.scopeDepth == 0) {
+        if (compiler->scopeDepth == 0) {
             return;
         }
 
-        for (int i = compiler.locals.size() - 1; i >= 0; i--) {
-            Local& local = compiler.locals[i];
-            if (local.depth != -1 && local.depth < compiler.scopeDepth) {
+        for (int i = compiler->locals.size() - 1; i >= 0; i--) {
+            Local& local = compiler->locals[i];
+            if (local.depth != -1 && local.depth < compiler->scopeDepth) {
                 break;
             }
 
@@ -547,8 +604,8 @@ private:
     }
 
     int resolveLocal(Token* name) {
-        for (int i = compiler.locals.size() - 1; i >= 0; i--) {
-            Local& local = compiler.locals[i];
+        for (int i = compiler->locals.size() - 1; i >= 0; i--) {
+            Local& local = compiler->locals[i];
 
             if (std::string(name->start, name->end) == std::string(local.name.start, local.name.end)) {
                 if (local.depth == -1) {
@@ -562,12 +619,27 @@ private:
     }
 
     void defineVariable(uint8_t global) {
-        if (compiler.scopeDepth > 0) {
+        if (compiler->scopeDepth > 0) {
             markInitialized();
             return;
         }
 
         emitBytes(OP_DEFINE_GLOBAL, global);
+    }
+
+    uint8_t argumentList() {
+        uint8_t argCount = 0;
+        if (!check(TOKEN_RIGHT_PAREN)) {
+            do {
+                expression();
+                if (argCount == 255) {
+                    error("Can't have more than 255 arguments.");
+                }
+                argCount++;
+            } while (match(TOKEN_COMMA));
+        }
+        consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+        return argCount;
     }
 
     void and_(bool canAssign) {
@@ -580,7 +652,7 @@ private:
     }
 
 public:
-    Parser(const std::string& source, Compiler& compiler, Obj* objects1) : compiler(compiler) {
+    Parser(const std::string& source, Compiler& compiler, Obj* objects1) : compiler(&compiler) {
         current_char = source.begin();
         end_char = source.end();
         objects = objects1;
@@ -594,19 +666,15 @@ public:
         }
 
         consume(TOKEN_EOF, "Expect end of expression.");
+
+        emitByte(OP_NIL);
         emitByte(OP_RETURN);
-        return hadError ? nullptr : compiler.function;
+        return hadError ? nullptr : compiler->function;
     }
 };
 
 Function* compile(const std::string& source, Obj* objects) {
-    Compiler compiler;
-    compiler.function = new Function(objects);
-
-    std::string name = "";
-    Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
-    compiler.locals.push_back(Local(token, 0));
-
+    Compiler compiler(nullptr, TYPE_SCRIPT, objects);
     Parser parser(source, compiler, objects);
     return parser.compile();
 }

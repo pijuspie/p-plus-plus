@@ -9,10 +9,17 @@ enum class InterpretResult {
     ok, compileError, runtimeError
 };
 
+struct CallFrame {
+    Function* function;
+    std::vector<uint8_t>::iterator ip;
+    int slots;
+
+    CallFrame(Function* function, int slots);
+};
+
 class VM {
 private:
-    Function* fn;
-    std::vector<uint8_t>::iterator ip;
+    std::vector<CallFrame> frames;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
 
@@ -24,6 +31,8 @@ private:
     void push(Value value);
     Value pop();
     Value peek(int distance);
+    bool call(Function& function, int argCount);
+    bool callValue(Value callee, int argCount);
 
     uint8_t readByte();
     uint16_t readShort();

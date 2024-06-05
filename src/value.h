@@ -30,6 +30,7 @@ ObjString& getObjString(Value value);
 std::string& getString(Value value);
 
 enum OpCode {
+    OP_CALL,
     OP_RETURN,
     OP_CONSTANT,
     OP_NIL,
@@ -55,6 +56,8 @@ enum OpCode {
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,
 };
+
+std::string getOpCode(OpCode opCode);
 
 struct Chunk {
     std::vector<uint8_t> code;

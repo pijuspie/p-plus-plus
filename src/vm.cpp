@@ -4,6 +4,12 @@
 
 VM global;
 
+CallFrame::CallFrame(Function* function1, int slots1) {
+    function = function1;
+    ip = function->chunk.code.begin();
+    slots = slots1;
+}
+
 InterpretResult interpret(std::string& source) {
     return global.interpret(source);
 }
@@ -11,10 +17,19 @@ InterpretResult interpret(std::string& source) {
 void VM::runtimeError(const std::string& message) {
     std::cerr << message << std::endl;
 
-    int instruction = ip - fn->chunk.code.begin() - 1;
-    int line = fn->chunk.lines[instruction];
-    std::cerr << "[line " << line << "] in script" << std::endl;
-    stack.clear();
+    for (int i = 0; i < frames.size(); i++) {
+        //for (int i = frames.size() - 1; i >= 0; i--) {
+        CallFrame& frame = frames[i];
+        Function& function = *frame.function;
+
+        size_t instruction = frame.ip - function.chunk.code.begin() - 1;
+        std::cerr << "[line " << function.chunk.lines[instruction] << "] in ";
+        if (function.name == "") {
+            std::cerr << "script" << std::endl;
+        } else {
+            std::cerr << function.name << "()" << std::endl;
+        }
+    }
 }
 
 void VM::freeObjects() {
@@ -44,18 +59,39 @@ Value VM::peek(int distance) {
     return stack[stack.size() - 1 - distance];
 }
 
+bool VM::call(Function& function, int argCount) {
+    if (argCount != function.arity) {
+        runtimeError("Expected " + std::to_string(function.arity) + " arguments but got " + std::to_string(argCount) + ".");
+        return false;
+    }
+
+    frames.push_back(CallFrame(&function, stack.size() - argCount - 1));
+    return true;
+}
+
+bool VM::callValue(Value callee, int argCount) {
+    if (callee.type == VAL_FUNCTION) {
+        return call(getFunction(callee), argCount);
+    }
+    runtimeError("Can only call functions and classes.");
+    return false;
+}
+
 uint8_t VM::readByte() {
-    ip++;
-    return ip[-1];
+    CallFrame& frame = frames.back();
+    frame.ip++;
+    return frame.ip[-1];
 }
 
 uint16_t VM::readShort() {
-    ip += 2;
-    return (uint16_t)((ip[-2] << 8) | ip[-1]);
+    CallFrame& frame = frames.back();
+    frame.ip += 2;
+    return (uint16_t)((frame.ip[-2] << 8) | frame.ip[-1]);
 }
 
 Value VM::readConstant() {
-    return fn->chunk.constants[readByte()];
+    CallFrame& frame = frames.back();
+    return frame.function->chunk.constants[readByte()];
 }
 
 bool valuesEqual(Value a, Value b) {
@@ -75,12 +111,36 @@ bool isFalsey(Value value) {
 }
 
 InterpretResult VM::run() {
+    CallFrame& frame = frames.back();
+
     for (;;) {
         uint8_t instruction = readByte();
-        //std::cout << (int)instruction << std::endl;
+        //std::cout << getOpCode(OpCode(instruction)) << std::endl;
         switch (instruction) {
-        case OP_RETURN:
-            return InterpretResult::ok;
+        case OP_CALL: {
+            int argCount = readByte();
+            if (!callValue(peek(argCount), argCount)) {
+                return InterpretResult::runtimeError;
+            }
+
+            frame = frames.back();
+            break;
+        }
+        case OP_RETURN: {
+            Value result = pop();
+            int slots = frame.slots;
+
+            frames.pop_back();
+            if (frames.size() == 0) {
+                pop();
+                return InterpretResult::ok;
+            }
+
+            stack.resize(slots);
+            push(result);
+            frame = frames.back();
+            break;
+        }
         case OP_CONSTANT: {
             Value constant = readConstant();
             push(constant);
@@ -125,7 +185,6 @@ InterpretResult VM::run() {
             } else if (peek(0).type == VAL_NUMBER && peek(1).type == VAL_NUMBER) {
                 push(pop().as.number + pop().as.number);
             } else {
-                std::cout << peek(0).type << " " << peek(1).type << std::endl;
                 runtimeError("Operands must be two numbers or two strings.");
                 return InterpretResult::runtimeError;
             }
@@ -168,16 +227,16 @@ InterpretResult VM::run() {
         }
         case OP_JUMP: {
             uint16_t offset = readShort();
-            ip += offset;
+            frame.ip += offset;
             break;
         }
         case OP_JUMP_IF_FALSE: {
             uint16_t offset = readShort();
-            if (isFalsey(peek(0))) ip += offset;
+            if (isFalsey(peek(0))) frame.ip += offset;
             break;
         }
         case OP_LOOP: {
-            ip -= readShort();
+            frame.ip -= readShort();
             break;
         }
         case OP_POP: pop(); break;
@@ -195,11 +254,11 @@ InterpretResult VM::run() {
             break;
         }
         case OP_GET_LOCAL:
-            push(stack[readByte()]);
+            push(stack[frame.slots + readByte()]);
             break;
         case OP_SET_LOCAL: {
             uint8_t slot = readByte();
-            stack[slot] = peek(0);
+            stack[frame.slots + slot] = peek(0);
             break;
         }
         case OP_GET_GLOBAL: {
@@ -231,17 +290,16 @@ InterpretResult VM::run() {
 }
 
 InterpretResult VM::interpret(std::string& source) {
-    fn = compile(source, objects);
+    Function* fn = compile(source, objects);
 
     if (fn == nullptr) {
         return InterpretResult::compileError;
     }
 
     stack.push_back(Value(*fn));
-    ip = fn->chunk.code.begin();
+    call(*fn, 0);
 
     InterpretResult result = run();
-    stack.pop_back();
 
     //freeObjects();
     return result;
