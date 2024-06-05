@@ -17,19 +17,21 @@ InterpretResult interpret(std::string& source) {
 void VM::runtimeError(const std::string& message) {
     std::cerr << message << std::endl;
 
-    for (int i = 0; i < frames.size(); i++) {
-        //for (int i = frames.size() - 1; i >= 0; i--) {
-        CallFrame& frame = frames[i];
-        Function& function = *frame.function;
+    for (int i = frames.size() - 1; i >= 0; i--) {
+        CallFrame* frame = &frames[i];
+        Function& function = *frame->function;
 
-        size_t instruction = frame.ip - function.chunk.code.begin() - 1;
+        size_t instruction = frame->ip - function.chunk.code.begin() - 1;
         std::cerr << "[line " << function.chunk.lines[instruction] << "] in ";
         if (function.name == "") {
             std::cerr << "script" << std::endl;
         } else {
             std::cerr << function.name << "()" << std::endl;
         }
+        frames.pop_back();
     }
+
+    stack.clear();
 }
 
 void VM::freeObjects() {
@@ -111,7 +113,7 @@ bool isFalsey(Value value) {
 }
 
 InterpretResult VM::run() {
-    CallFrame& frame = frames.back();
+    CallFrame* frame = &frames[frames.size() - 1];
 
     for (;;) {
         uint8_t instruction = readByte();
@@ -123,12 +125,12 @@ InterpretResult VM::run() {
                 return InterpretResult::runtimeError;
             }
 
-            frame = frames.back();
+            frame = &frames[frames.size() - 1];
             break;
         }
         case OP_RETURN: {
             Value result = pop();
-            int slots = frame.slots;
+            int slots = frame->slots;
 
             frames.pop_back();
             if (frames.size() == 0) {
@@ -138,7 +140,7 @@ InterpretResult VM::run() {
 
             stack.resize(slots);
             push(result);
-            frame = frames.back();
+            frame = &frames[frames.size() - 1];
             break;
         }
         case OP_CONSTANT: {
@@ -227,16 +229,16 @@ InterpretResult VM::run() {
         }
         case OP_JUMP: {
             uint16_t offset = readShort();
-            frame.ip += offset;
+            frame->ip += offset;
             break;
         }
         case OP_JUMP_IF_FALSE: {
             uint16_t offset = readShort();
-            if (isFalsey(peek(0))) frame.ip += offset;
+            if (isFalsey(peek(0))) frame->ip += offset;
             break;
         }
         case OP_LOOP: {
-            frame.ip -= readShort();
+            frame->ip -= readShort();
             break;
         }
         case OP_POP: pop(); break;
@@ -254,11 +256,11 @@ InterpretResult VM::run() {
             break;
         }
         case OP_GET_LOCAL:
-            push(stack[frame.slots + readByte()]);
+            push(stack[frame->slots + readByte()]);
             break;
         case OP_SET_LOCAL: {
             uint8_t slot = readByte();
-            stack[frame.slots + slot] = peek(0);
+            stack[frame->slots + slot] = peek(0);
             break;
         }
         case OP_GET_GLOBAL: {
