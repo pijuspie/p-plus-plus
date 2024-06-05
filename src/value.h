@@ -5,6 +5,7 @@
 #include <vector>
 
 typedef struct Value Value;
+typedef struct VM VM;
 
 enum ValueType {
     VAL_NIL,
@@ -12,6 +13,7 @@ enum ValueType {
     VAL_NUMBER,
     VAL_STRING,
     VAL_FUNCTION,
+    VAL_NATIVE
 };
 
 struct Obj {
@@ -19,6 +21,16 @@ struct Obj {
     Obj* next;
     Obj(ValueType type, Obj* next);
 };
+
+typedef bool (VM::* NativeFn)(int argCount, Value* args);
+
+struct Native {
+    Obj obj;
+    NativeFn function;
+    Native(NativeFn function, Obj* next);
+};
+
+Native& getNative(Value value);
 
 struct ObjString {
     Obj obj;
@@ -88,6 +100,7 @@ struct Value {
     Value(double number);
     Value(ObjString& string);
     Value(Function& function);
+    Value(Native& native);
 };
 
 std::string stringify(Value value);

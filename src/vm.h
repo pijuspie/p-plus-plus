@@ -25,7 +25,11 @@ private:
 
     Obj* objects = nullptr;
 
+    bool clockNative(int argCount, Value* args);
+    bool readNumberNative(int argCount, Value* args);
+
     void runtimeError(const std::string& format);
+    void defineNative(const std::string& name, NativeFn function, Obj* objects);
     void freeObjects();
 
     void push(Value value);

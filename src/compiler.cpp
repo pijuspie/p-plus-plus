@@ -202,6 +202,8 @@ private:
             printStatement();
         } else if (match(TOKEN_IF)) {
             ifStatement();
+        } else if (match(TOKEN_RETURN)) {
+            returnStatement();
         } else if (match(TOKEN_WHILE)) {
             whileStatement();
         } else if (match(TOKEN_FOR)) {
@@ -277,6 +279,21 @@ private:
         emitByte(OP_PRINT);
     }
 
+    void returnStatement() {
+        if (compiler->type == TYPE_SCRIPT) {
+            error("Can't return from top-level code.");
+        }
+
+        if (match(TOKEN_SEMICOLON)) {
+            emitByte(OP_NIL);
+            emitByte(OP_RETURN);
+        } else {
+            expression();
+            consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
+            emitByte(OP_RETURN);
+        }
+    }
+
     void forStatement() {
         beginScope();
         consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
@@ -286,8 +303,6 @@ private:
         } else if (!match(TOKEN_SEMICOLON)) {
             expressionStatement();
         }
-
-        consume(TOKEN_SEMICOLON, "Expect ';'.");
 
         int loopStart = getChunk().code.size();
         int exitJump = -1;

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <time.h>
 #include "vm.h"
 #include "compiler.h"
 
@@ -12,6 +13,36 @@ CallFrame::CallFrame(Function* function1, int slots1) {
 
 InterpretResult interpret(std::string& source) {
     return global.interpret(source);
+}
+
+bool VM::clockNative(int argCount, Value* args) {
+    if (argCount > 0) {
+        runtimeError("Expected 0 arguments but got " + std::to_string(argCount) + ".");
+        return false;
+    }
+
+    push(Value((double)clock() / CLOCKS_PER_SEC));
+    return true;
+}
+
+bool VM::readNumberNative(int argCount, Value* args) {
+    if (argCount > 0) {
+        runtimeError("Expected 0 arguments but got " + std::to_string(argCount) + ".");
+        return false;
+    }
+
+    std::string x;
+    std::getline(std::cin, x);
+    double d;
+
+    try {
+        d = std::stod(x);
+    } catch (const std::invalid_argument&) {
+        d = 0;
+    }
+
+    push(Value(d));
+    return true;
 }
 
 void VM::runtimeError(const std::string& message) {
@@ -34,6 +65,17 @@ void VM::runtimeError(const std::string& message) {
     stack.clear();
 }
 
+void VM::defineNative(const std::string& name, NativeFn function, Obj* objects) {
+    ObjString string(name, objects);
+    push(Value(string));
+    Native* native = new Native(function, objects);
+    push(Value(*native));
+
+    globals.insert({ getString(stack[1]), stack[2] });
+    pop();
+    pop();
+}
+
 void VM::freeObjects() {
     while (objects != nullptr) {
         Obj* next = objects->next;
@@ -41,6 +83,7 @@ void VM::freeObjects() {
         switch (objects->type) {
         case VAL_STRING: delete (ObjString*)objects; break;
         case VAL_FUNCTION: delete (Function*)objects; break;
+        case VAL_NATIVE: delete (Native*)objects; break;
         }
 
         objects = next;
@@ -72,8 +115,19 @@ bool VM::call(Function& function, int argCount) {
 }
 
 bool VM::callValue(Value callee, int argCount) {
-    if (callee.type == VAL_FUNCTION) {
+    switch (callee.type) {
+    case VAL_FUNCTION:
         return call(getFunction(callee), argCount);
+    case VAL_NATIVE: {
+        NativeFn native = getNative(callee).function;
+        if (!(this->*native)(argCount, &stack[stack.size() - argCount])) {
+            return false;
+        }
+        Value result = pop();
+        stack.resize(stack.size() - argCount - 1);
+        push(result);
+        return true;
+    }
     }
     runtimeError("Can only call functions and classes.");
     return false;
@@ -114,6 +168,14 @@ bool isFalsey(Value value) {
 
 InterpretResult VM::run() {
     CallFrame* frame = &frames[frames.size() - 1];
+
+    if (globals.find("clock") == globals.end()) {
+        defineNative("clock", clockNative, objects);
+    }
+
+    if (globals.find("readNumber") == globals.end()) {
+        defineNative("readNumber", readNumberNative, objects);
+    }
 
     for (;;) {
         uint8_t instruction = readByte();

@@ -6,6 +6,14 @@ Obj::Obj(ValueType type1, Obj* next1) {
     next = next1;
 }
 
+Native::Native(NativeFn function1, Obj* next) : obj(Obj(VAL_NATIVE, next)) {
+    function = function1;
+}
+
+Native& getNative(Value value) {
+    return *(Native*)value.as.object;
+}
+
 ObjString::ObjString(const std::string& string1, Obj* next) : obj(Obj(VAL_STRING, next)) {
     string = string1;
 }
@@ -80,13 +88,26 @@ Value::Value(Function& function) {
     as.object = (Obj*)&function;
 }
 
+Value::Value(Native& native) {
+    type = VAL_NATIVE;
+    as.object = (Obj*)&native;
+}
+
 std::string stringify(Value value) {
     switch (value.type) {
     case VAL_NIL: return "nil";
     case VAL_BOOL: return (value.as.boolean ? "true" : "false");
     case VAL_NUMBER: return std::to_string(value.as.number);
     case VAL_STRING: return getString(value);
-    case VAL_FUNCTION: return "<fn " + getFunction(value).name + ">";
+    case VAL_NATIVE: return "<native fn>";
+    case VAL_FUNCTION: {
+        Function& fn = getFunction(value);
+        if (fn.name == "") {
+            return "<script>";
+        } else {
+            return "<fn " + fn.name + ">";
+        }
+    }
     }
 
     return "unexpected type";
