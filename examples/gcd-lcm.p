@@ -1,5 +1,7 @@
-var x = 24;
-var y = 36;
+print "Number x:";
+var x = readNumber();
+print "Number y:";
+var y = readNumber();
 
 var a = x;
 var b = y;
@@ -14,5 +16,7 @@ while (a > 0 and b > 0) {
     a = a - b;
 }
 
+print "GCD:";
 print b;
+print "LCM:";
 print x * y / b;

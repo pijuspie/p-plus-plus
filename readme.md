@@ -45,16 +45,41 @@ while (a < 10) {
 }
 
 var c = 1;
-for (var b = 0; b<a; b++) {
+for (var b = 0; b < a; b = b + 1) {
     c = c * 2;
 }
 ```
 
-#### Printing
+#### Functions
 
 ```
+fun sum(a, b, c) {
+    return a+b+c;
+}
+
+var sum1 = 4 + sum(5, 6, 7);
+
+fun out(x, y) {
+    print x+" "+y;
+}
+
+out("Hello", "world!");
+```
+
+#### Other
+
+```
+var begin = clock();
+
 var a = "Hello world!";
 print a;
+
+print "Number x:";
+var x = readNumber();
+
+var end = clock();
+print end-begin;
+print "Seconds";
 ```
 
 ## Examples
