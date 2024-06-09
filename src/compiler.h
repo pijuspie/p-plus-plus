@@ -7,9 +7,16 @@
 
 struct Local {
     Token name;
+    bool isCaptured = false;
     int depth;
 
     Local(Token name, int depth);
+};
+
+struct Upvalue {
+    uint8_t index;
+    bool isLocal;
+    Upvalue(bool isLocal, uint8_t index);
 };
 
 enum FunctionType {
@@ -23,6 +30,7 @@ struct Compiler {
     FunctionType type;
 
     std::vector<Local> locals;
+    std::vector<Upvalue> upvalues;
     int scopeDepth = 0;
 
     Compiler(Compiler* enclosing, FunctionType type, Obj* objects);

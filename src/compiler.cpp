@@ -4,6 +4,8 @@
 
 Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
+Upvalue::Upvalue(bool isLocal, uint8_t index) : isLocal(isLocal), index(index) {};
+
 Compiler::Compiler(Compiler* enclosing1, FunctionType type1, Obj* objects) {
     enclosing = enclosing1;
     function = new Function(objects);
@@ -270,7 +272,12 @@ private:
 
         Function& fn = *compiler->function;
         compiler = compiler->enclosing;
-        emitBytes(OP_CONSTANT, makeConstant(Value(fn)));
+        emitBytes(OP_CLOSURE, makeConstant(Value(fn)));
+
+        for (int i = 0; i < fn.upvalueCount; i++) {
+            emitByte(current.upvalues[i].isLocal ? 1 : 0);
+            emitByte(current.upvalues[i].index);
+        }
     }
 
     void printStatement() {
@@ -429,11 +436,14 @@ private:
 
     void namedVariable(Token name, bool canAssign) {
         uint8_t getOp, setOp;
-        int arg = resolveLocal(&name);
+        int arg = resolveLocal(compiler, &name);
 
         if (arg != -1) {
             getOp = OP_GET_LOCAL;
             setOp = OP_SET_LOCAL;
+        } else if ((arg = resolveUpvalue(compiler, &name)) != -1) {
+            getOp = OP_GET_UPVALUE;
+            setOp = OP_SET_UPVALUE;
         } else {
             arg = identifierConstant(&name);
             getOp = OP_GET_GLOBAL;
@@ -618,9 +628,9 @@ private:
         addLocal(previous);
     }
 
-    int resolveLocal(Token* name) {
-        for (int i = compiler->locals.size() - 1; i >= 0; i--) {
-            Local& local = compiler->locals[i];
+    int resolveLocal(Compiler* comp, Token* name) {
+        for (int i = comp->locals.size() - 1; i >= 0; i--) {
+            Local& local = comp->locals[i];
 
             if (std::string(name->start, name->end) == std::string(local.name.start, local.name.end)) {
                 if (local.depth == -1) {
@@ -628,6 +638,41 @@ private:
                 }
                 return i;
             }
+        }
+
+        return -1;
+    }
+
+    int addUpvalue(Compiler* comp, uint8_t index, bool isLocal) {
+        int upvalueCount = compiler->function->upvalueCount;
+
+        for (int i = 0; i < upvalueCount; i++) {
+            Upvalue& upvalue = compiler->upvalues[i];
+            if (upvalue.index == index && upvalue.isLocal == isLocal) {
+                return i;
+            }
+        }
+
+        if (upvalueCount == 256) {
+            error("Too many closure variables in function.");
+            return 0;
+        }
+
+        compiler->upvalues.push_back(Upvalue(isLocal, index));
+        return compiler->function->upvalueCount++;
+    }
+
+    int resolveUpvalue(Compiler* comp, Token* name) {
+        if (comp->enclosing == NULL) return -1;
+
+        int local = resolveLocal(comp->enclosing, name);
+        if (local != -1) {
+            return addUpvalue(compiler, (uint8_t)local, true);
+        }
+
+        int upvalue = resolveUpvalue(compiler->enclosing, name);
+        if (upvalue != -1) {
+            return addUpvalue(compiler, (uint8_t)upvalue, false);
         }
 
         return -1;

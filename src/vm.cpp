@@ -5,9 +5,9 @@
 
 VM global;
 
-CallFrame::CallFrame(Function* function1, int slots1) {
-    function = function1;
-    ip = function->chunk.code.begin();
+CallFrame::CallFrame(Closure* closure1, int slots1) {
+    closure = closure1;
+    ip = closure->function->chunk.code.begin();
     slots = slots1;
 }
 
@@ -50,7 +50,7 @@ void VM::runtimeError(const std::string& message) {
 
     for (int i = frames.size() - 1; i >= 0; i--) {
         CallFrame* frame = &frames[i];
-        Function& function = *frame->function;
+        Function& function = *frame->closure->function;
 
         size_t instruction = frame->ip - function.chunk.code.begin() - 1;
         std::cerr << "[line " << function.chunk.lines[instruction] << "] in ";
@@ -84,6 +84,8 @@ void VM::freeObjects() {
         case VAL_STRING: delete (ObjString*)objects; break;
         case VAL_FUNCTION: delete (Function*)objects; break;
         case VAL_NATIVE: delete (Native*)objects; break;
+        case VAL_CLOSURE: delete (Closure*)objects; break;
+        case VAL_UPVALUE: delete (Upvalue*)objects; break;
         }
 
         objects = next;
@@ -104,20 +106,18 @@ Value VM::peek(int distance) {
     return stack[stack.size() - 1 - distance];
 }
 
-bool VM::call(Function& function, int argCount) {
-    if (argCount != function.arity) {
-        runtimeError("Expected " + std::to_string(function.arity) + " arguments but got " + std::to_string(argCount) + ".");
+bool VM::call(Closure& closure, int argCount) {
+    if (argCount != closure.function->arity) {
+        runtimeError("Expected " + std::to_string(closure.function->arity) + " arguments but got " + std::to_string(argCount) + ".");
         return false;
     }
 
-    frames.push_back(CallFrame(&function, stack.size() - argCount - 1));
+    frames.push_back(CallFrame(&closure, stack.size() - argCount - 1));
     return true;
 }
 
 bool VM::callValue(Value callee, int argCount) {
     switch (callee.type) {
-    case VAL_FUNCTION:
-        return call(getFunction(callee), argCount);
     case VAL_NATIVE: {
         NativeFn native = getNative(callee).function;
         if (!(this->*native)(argCount, &stack[stack.size() - argCount])) {
@@ -128,9 +128,16 @@ bool VM::callValue(Value callee, int argCount) {
         push(result);
         return true;
     }
+    case VAL_CLOSURE:
+        return call(getClosure(callee), argCount);
     }
     runtimeError("Can only call functions and classes.");
     return false;
+}
+
+ObjUpvalue* VM::captureUpvalue(Value* local) {
+    ObjUpvalue* createdUpvalue = new ObjUpvalue(local, objects);
+    return createdUpvalue;
 }
 
 uint8_t VM::readByte() {
@@ -147,7 +154,7 @@ uint16_t VM::readShort() {
 
 Value VM::readConstant() {
     CallFrame& frame = frames.back();
-    return frame.function->chunk.constants[readByte()];
+    return frame.closure->function->chunk.constants[readByte()];
 }
 
 bool valuesEqual(Value a, Value b) {
@@ -188,6 +195,21 @@ InterpretResult VM::run() {
             }
 
             frame = &frames[frames.size() - 1];
+            break;
+        }
+        case OP_CLOSURE: {
+            Function& function = getFunction(readConstant());
+            Closure* closure = new Closure(&function, objects);
+            push(Value(*closure));
+            for (int i = 0; i < closure->upvalues.size(); i++) {
+                uint8_t isLocal = readByte();
+                uint8_t index = readByte();
+                if (isLocal) {
+                    closure->upvalues[i] = captureUpvalue(&stack[frame->slots + index]);
+                } else {
+                    closure->upvalues[i] = frame->closure->upvalues[index];
+                }
+            }
             break;
         }
         case OP_RETURN: {
@@ -349,6 +371,16 @@ InterpretResult VM::run() {
             value->second = peek(0);
             break;
         }
+        case OP_GET_UPVALUE: {
+            uint8_t slot = readByte();
+            push(*frame->closure->upvalues[slot]->location);
+            break;
+        }
+        case OP_SET_UPVALUE: {
+            uint8_t slot = readByte();
+            *frame->closure->upvalues[slot]->location = peek(0);
+            break;
+        }
         }
     }
 }
@@ -361,7 +393,10 @@ InterpretResult VM::interpret(std::string& source) {
     }
 
     stack.push_back(Value(*fn));
-    call(*fn, 0);
+    Closure closure = Closure(fn, objects);
+    pop();
+    push(Value(closure));
+    call(closure, 0);
 
     InterpretResult result = run();
 

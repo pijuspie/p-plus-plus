@@ -26,6 +26,8 @@ std::string& getString(Value value) {
     return getObjString(value).string;
 }
 
+ObjUpvalue::ObjUpvalue(Value* location, Obj* next) : obj(Obj(VAL_UPVALUE, next)), location(location) {};
+
 std::string getOpCode(OpCode opCode) {
     switch (opCode) {
     case OP_CALL: return "OP_CALL";
@@ -64,6 +66,14 @@ Function& getFunction(Value value) {
     return *(Function*)value.as.object;
 }
 
+Closure::Closure(Function* function, Obj* next) : function(function), obj(Obj(VAL_CLOSURE, next)) {
+    upvalues.resize(function->upvalueCount, nullptr);
+};
+
+Closure& getClosure(Value value) {
+    return *(Closure*)value.as.object;
+}
+
 Value::Value() : type(VAL_NIL) {
     as.number = 0;
 };
@@ -93,6 +103,11 @@ Value::Value(Native& native) {
     as.object = (Obj*)&native;
 }
 
+Value::Value(Closure& closure) {
+    type = VAL_CLOSURE;
+    as.object = (Obj*)&closure;
+}
+
 std::string stringify(Value value) {
     switch (value.type) {
     case VAL_NIL: return "nil";
@@ -100,6 +115,14 @@ std::string stringify(Value value) {
     case VAL_NUMBER: return std::to_string(value.as.number);
     case VAL_STRING: return getString(value);
     case VAL_NATIVE: return "<native fn>";
+    case VAL_CLOSURE: {
+        Function& fn = *getClosure(value).function;
+        if (fn.name == "") {
+            return "<script>";
+        } else {
+            return "<fn " + fn.name + ">";
+        }
+    };
     case VAL_FUNCTION: {
         Function& fn = getFunction(value);
         if (fn.name == "") {
@@ -108,6 +131,7 @@ std::string stringify(Value value) {
             return "<fn " + fn.name + ">";
         }
     }
+    case VAL_UPVALUE: return "upvalue";
     }
 
     return "unexpected type";

@@ -10,11 +10,11 @@ enum class InterpretResult {
 };
 
 struct CallFrame {
-    Function* function;
+    Closure* closure;
     std::vector<uint8_t>::iterator ip;
     int slots;
 
-    CallFrame(Function* function, int slots);
+    CallFrame(Closure* closure, int slots);
 };
 
 class VM {
@@ -35,8 +35,9 @@ private:
     void push(Value value);
     Value pop();
     Value peek(int distance);
-    bool call(Function& function, int argCount);
+    bool call(Closure& closure, int argCount);
     bool callValue(Value callee, int argCount);
+    ObjUpvalue* captureUpvalue(Value* local);
 
     uint8_t readByte();
     uint16_t readShort();

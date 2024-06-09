@@ -13,7 +13,9 @@ enum ValueType {
     VAL_NUMBER,
     VAL_STRING,
     VAL_FUNCTION,
-    VAL_NATIVE
+    VAL_NATIVE,
+    VAL_CLOSURE,
+    VAL_UPVALUE,
 };
 
 struct Obj {
@@ -41,8 +43,15 @@ struct ObjString {
 ObjString& getObjString(Value value);
 std::string& getString(Value value);
 
+struct ObjUpvalue {
+    Obj obj;
+    Value* location;
+    ObjUpvalue(Value* location, Obj* obj);
+};
+
 enum OpCode {
     OP_CALL,
+    OP_CLOSURE,
     OP_RETURN,
     OP_CONSTANT,
     OP_NIL,
@@ -67,6 +76,8 @@ enum OpCode {
     OP_SET_LOCAL,
     OP_GET_GLOBAL,
     OP_SET_GLOBAL,
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
 };
 
 std::string getOpCode(OpCode opCode);
@@ -80,12 +91,22 @@ struct Chunk {
 struct Function {
     Obj obj;
     int arity = 0;
+    int upvalueCount = 0;
     Chunk chunk;
     std::string name;
     Function(Obj* next);
 };
 
 Function& getFunction(Value value);
+
+struct Closure {
+    Obj obj;
+    Function* function;
+    std::vector<ObjUpvalue*> upvalues;
+    Closure(Function* function, Obj* obj);
+};
+
+Closure& getClosure(Value value);
 
 struct Value {
     ValueType type;
@@ -101,6 +122,7 @@ struct Value {
     Value(ObjString& string);
     Value(Function& function);
     Value(Native& native);
+    Value(Closure& closure);
 };
 
 std::string stringify(Value value);
