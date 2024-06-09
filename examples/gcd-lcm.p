@@ -1,6 +1,6 @@
-print "Number x:";
+print "Number x: ";
 var x = readNumber();
-print "Number y:";
+print "Number y: ";
 var y = readNumber();
 
 var a = x;
@@ -16,7 +16,7 @@ while (a > 0 and b > 0) {
     a = a - b;
 }
 
-print "GCD:";
+print "GCD: ";
 print b;
-print "LCM:";
+print "\nLCM: ";
 print x * y / b;

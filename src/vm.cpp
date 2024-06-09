@@ -338,7 +338,7 @@ InterpretResult VM::run() {
             break;
         }
         case OP_PRINT: {
-            std::cout << stringify(pop()) << std::endl;
+            std::cout << stringify(pop());
             break;
         }
         case OP_JUMP: {

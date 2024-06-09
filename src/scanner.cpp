@@ -96,6 +96,9 @@ Token string(StringIterator& current, StringIterator end, int& line) {
 
     while (current != end && current[0] != '"') {
         if (current[0] == '\n') line++;
+        if (current[0] == '\\' && current + 1 != end && current[1] == '"') {
+            current++;
+        }
         current++;
     }
 

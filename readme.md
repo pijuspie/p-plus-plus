@@ -89,3 +89,15 @@ Greatest common divider and lowest common multiple:
 ```
 p++ examples/gcd-lcm.p
 ```
+
+Function closures:
+
+```
+p++ examples/closures.p
+```
+
+The Fibonacci sequence (using recursion):
+
+```
+p++ examples/fibonacci.p
+```

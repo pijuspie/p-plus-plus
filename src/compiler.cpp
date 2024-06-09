@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "value.h"
 #include <iostream>
+#include <sstream>
 
 Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
@@ -429,7 +430,26 @@ private:
     }
 
     void string(bool canAssign) {
-        ObjString* value = new ObjString(std::string(previous.start + 1, previous.end - 1), objects);
+        std::string string = std::string(previous.start + 1, previous.end - 1);
+        std::stringstream ss;
+
+        for (int i = 0; i < string.size(); i++) {
+            if (string[i] != '\\') {
+                ss << string[i];
+                continue;
+            }
+
+            i++;
+            switch (string[i]) {
+            case '"': ss << '"'; break;
+            case '\'': ss << '\''; break;
+            case 'n': ss << '\n'; break;
+            case '\\': ss << '\\'; break;
+            default: break;
+            }
+        }
+
+        ObjString* value = new ObjString(ss.str(), objects);
         objects = (Obj*)value;
         emitConstant(Value(*value));
     }
