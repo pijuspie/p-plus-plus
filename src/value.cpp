@@ -26,12 +26,14 @@ std::string& getString(Value value) {
     return getObjString(value).string;
 }
 
-ObjUpvalue::ObjUpvalue(Value* location, Obj* next) : obj(Obj(VAL_UPVALUE, next)), location(location) {};
+ObjUpvalue::ObjUpvalue(Value* location, Obj* obj, ObjUpvalue* next) : obj(Obj(VAL_UPVALUE, obj)), location(location), next(next) {};
 
 std::string getOpCode(OpCode opCode) {
     switch (opCode) {
     case OP_CALL: return "OP_CALL";
+    case OP_CLOSURE: return "OP_CLOSURE";
     case OP_RETURN: return "OP_RETURN";
+    case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE";
     case OP_CONSTANT: return "OP_CONSTANT";
     case OP_NIL: return "OP_NIL";
     case OP_TRUE: return "OP_TRUE";
@@ -55,8 +57,10 @@ std::string getOpCode(OpCode opCode) {
     case OP_SET_LOCAL: return "OP_SET_LOCAL";
     case OP_GET_GLOBAL: return "OP_GET_GLOBAL";
     case OP_SET_GLOBAL: return "OP_SET_GLOBAL";
+    case OP_GET_UPVALUE: return "OP_GET_UPVALUE";
+    case OP_SET_UPVALUE: return "OP_SET_UPVALUE";
     default:
-        return "Unexpected code";
+        return "Unexpected code: " + std::to_string(opCode);
     }
 }
 

@@ -5,6 +5,7 @@
 #include <vector>
 
 typedef struct Value Value;
+typedef struct ObjUpvalue ObjUpvalue;
 typedef struct VM VM;
 
 enum ValueType {
@@ -43,15 +44,10 @@ struct ObjString {
 ObjString& getObjString(Value value);
 std::string& getString(Value value);
 
-struct ObjUpvalue {
-    Obj obj;
-    Value* location;
-    ObjUpvalue(Value* location, Obj* obj);
-};
-
 enum OpCode {
     OP_CALL,
     OP_CLOSURE,
+    OP_CLOSE_UPVALUE,
     OP_RETURN,
     OP_CONSTANT,
     OP_NIL,
@@ -126,5 +122,13 @@ struct Value {
 };
 
 std::string stringify(Value value);
+
+struct ObjUpvalue {
+    Obj obj;
+    Value* location;
+    Value closed;
+    ObjUpvalue* next = nullptr;
+    ObjUpvalue(Value* location, Obj* obj, ObjUpvalue* next);
+};
 
 #endif

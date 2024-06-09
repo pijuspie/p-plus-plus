@@ -15,6 +15,12 @@ InterpretResult interpret(std::string& source) {
     return global.interpret(source);
 }
 
+VM::VM() {
+    stack.reserve(256);
+    defineNative("clock", clockNative, objects);
+    defineNative("readNumber", readNumberNative, objects);
+}
+
 bool VM::clockNative(int argCount, Value* args) {
     if (argCount > 0) {
         runtimeError("Expected 0 arguments but got " + std::to_string(argCount) + ".");
@@ -71,7 +77,7 @@ void VM::defineNative(const std::string& name, NativeFn function, Obj* objects) 
     Native* native = new Native(function, objects);
     push(Value(*native));
 
-    globals.insert({ getString(stack[1]), stack[2] });
+    globals.insert({ getString(stack[0]), stack[1] });
     pop();
     pop();
 }
@@ -136,8 +142,35 @@ bool VM::callValue(Value callee, int argCount) {
 }
 
 ObjUpvalue* VM::captureUpvalue(Value* local) {
-    ObjUpvalue* createdUpvalue = new ObjUpvalue(local, objects);
+    ObjUpvalue* prevUpvalue = nullptr;
+    ObjUpvalue* upvalue = openUpvalues;
+    while (upvalue != nullptr && upvalue->location > local) {
+        prevUpvalue = upvalue;
+        upvalue = upvalue->next;
+    }
+
+    if (upvalue != nullptr && upvalue->location == local) {
+        return upvalue;
+    }
+
+    ObjUpvalue* createdUpvalue = new ObjUpvalue(local, objects, upvalue);
+
+    if (prevUpvalue == nullptr) {
+        openUpvalues = createdUpvalue;
+    } else {
+        prevUpvalue->next = createdUpvalue;
+    }
+
     return createdUpvalue;
+}
+
+void VM::closeUpvalues(Value* last) {
+    while (openUpvalues != nullptr && openUpvalues->location >= last) {
+        ObjUpvalue* upvalue = openUpvalues;
+        upvalue->closed = *upvalue->location;
+        upvalue->location = &upvalue->closed;
+        openUpvalues = upvalue->next;
+    }
 }
 
 uint8_t VM::readByte() {
@@ -176,14 +209,6 @@ bool isFalsey(Value value) {
 InterpretResult VM::run() {
     CallFrame* frame = &frames[frames.size() - 1];
 
-    if (globals.find("clock") == globals.end()) {
-        defineNative("clock", clockNative, objects);
-    }
-
-    if (globals.find("readNumber") == globals.end()) {
-        defineNative("readNumber", readNumberNative, objects);
-    }
-
     for (;;) {
         uint8_t instruction = readByte();
         //std::cout << getOpCode(OpCode(instruction)) << std::endl;
@@ -212,9 +237,14 @@ InterpretResult VM::run() {
             }
             break;
         }
+        case OP_CLOSE_UPVALUE:
+            closeUpvalues(&stack[stack.size() - 1]);
+            pop();
+            break;
         case OP_RETURN: {
             Value result = pop();
             int slots = frame->slots;
+            closeUpvalues(&stack[slots]);
 
             frames.pop_back();
             if (frames.size() == 0) {

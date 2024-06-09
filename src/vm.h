@@ -22,7 +22,7 @@ private:
     std::vector<CallFrame> frames;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
-
+    ObjUpvalue* openUpvalues = nullptr;
     Obj* objects = nullptr;
 
     bool clockNative(int argCount, Value* args);
@@ -38,6 +38,7 @@ private:
     bool call(Closure& closure, int argCount);
     bool callValue(Value callee, int argCount);
     ObjUpvalue* captureUpvalue(Value* local);
+    void closeUpvalues(Value* last);
 
     uint8_t readByte();
     uint16_t readShort();
@@ -45,6 +46,7 @@ private:
     InterpretResult run();
 public:
     InterpretResult interpret(std::string& source);
+    VM();
 };
 
 InterpretResult interpret(std::string& source);

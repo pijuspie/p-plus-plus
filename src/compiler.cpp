@@ -230,8 +230,12 @@ private:
     void endScope() {
         compiler->scopeDepth--;
         while (compiler->locals.size() > 0 && compiler->locals[compiler->locals.size() - 1].depth > compiler->scopeDepth) {
+            if (compiler->locals[compiler->locals.size() - 1].isCaptured) {
+                emitByte(OP_CLOSE_UPVALUE);
+            } else {
+                emitByte(OP_POP);
+            }
             compiler->locals.pop_back();
-            emitByte(OP_POP);
         }
     }
 
@@ -644,10 +648,10 @@ private:
     }
 
     int addUpvalue(Compiler* comp, uint8_t index, bool isLocal) {
-        int upvalueCount = compiler->function->upvalueCount;
+        int upvalueCount = comp->function->upvalueCount;
 
         for (int i = 0; i < upvalueCount; i++) {
-            Upvalue& upvalue = compiler->upvalues[i];
+            Upvalue& upvalue = comp->upvalues[i];
             if (upvalue.index == index && upvalue.isLocal == isLocal) {
                 return i;
             }
@@ -658,8 +662,8 @@ private:
             return 0;
         }
 
-        compiler->upvalues.push_back(Upvalue(isLocal, index));
-        return compiler->function->upvalueCount++;
+        comp->upvalues.push_back(Upvalue(isLocal, index));
+        return comp->function->upvalueCount++;
     }
 
     int resolveUpvalue(Compiler* comp, Token* name) {
@@ -667,12 +671,13 @@ private:
 
         int local = resolveLocal(comp->enclosing, name);
         if (local != -1) {
-            return addUpvalue(compiler, (uint8_t)local, true);
+            comp->enclosing->locals[local].isCaptured = true;
+            return addUpvalue(comp, (uint8_t)local, true);
         }
 
-        int upvalue = resolveUpvalue(compiler->enclosing, name);
+        int upvalue = resolveUpvalue(comp->enclosing, name);
         if (upvalue != -1) {
-            return addUpvalue(compiler, (uint8_t)upvalue, false);
+            return addUpvalue(comp, (uint8_t)upvalue, false);
         }
 
         return -1;
