@@ -5,14 +5,14 @@
 
 Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
-Upvalue::Upvalue(bool isLocal, uint8_t index) : isLocal(isLocal), index(index) {};
+OpenUpvalue::OpenUpvalue(bool isLocal, uint8_t index) : isLocal(isLocal), index(index) {};
 
-Compiler::Compiler(Compiler* enclosing1, FunctionType type1, Obj* objects) {
+Compiler::Compiler(Compiler* enclosing1, FunctionType type1, Object*& objects) {
     enclosing = enclosing1;
-    function = new Function(objects);
     type = type1;
 
     std::string name = "";
+    function = newFunction(name, objects);
     Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
     locals.push_back(Local(token, 0));
 }
@@ -43,7 +43,7 @@ struct ParseRule {
 
 class Parser {
 private:
-    Obj* objects;
+    Object*& objects;
     Compiler* compiler;
 
     int line = 1;
@@ -275,11 +275,11 @@ private:
         emitByte(OP_NIL);
         emitByte(OP_RETURN);
 
-        Function& fn = *compiler->function;
+        Function* fn = compiler->function;
         compiler = compiler->enclosing;
         emitBytes(OP_CLOSURE, makeConstant(Value(fn)));
 
-        for (int i = 0; i < fn.upvalueCount; i++) {
+        for (int i = 0; i < fn->upvalueCount; i++) {
             emitByte(current.upvalues[i].isLocal ? 1 : 0);
             emitByte(current.upvalues[i].index);
         }
@@ -449,9 +449,9 @@ private:
             }
         }
 
-        ObjString* value = new ObjString(ss.str(), objects);
-        objects = (Obj*)value;
-        emitConstant(Value(*value));
+        std::string string2 = ss.str();
+        String* value = newString(string2, objects);
+        emitConstant(Value(value));
     }
 
     void variable(bool canAssign) {
@@ -619,9 +619,9 @@ private:
     }
 
     uint8_t identifierConstant(Token* name) {
-        ObjString* value = new ObjString(std::string(previous.start, previous.end), objects);
-        objects = (Obj*)value;
-        return makeConstant(Value(*value));
+        std::string string = std::string(previous.start, previous.end);
+        String* value = newString(string, objects);
+        return makeConstant(Value(value));
     }
 
     void addLocal(Token name) {
@@ -671,7 +671,7 @@ private:
         int upvalueCount = comp->function->upvalueCount;
 
         for (int i = 0; i < upvalueCount; i++) {
-            Upvalue& upvalue = comp->upvalues[i];
+            OpenUpvalue& upvalue = comp->upvalues[i];
             if (upvalue.index == index && upvalue.isLocal == isLocal) {
                 return i;
             }
@@ -682,7 +682,7 @@ private:
             return 0;
         }
 
-        comp->upvalues.push_back(Upvalue(isLocal, index));
+        comp->upvalues.push_back(OpenUpvalue(isLocal, index));
         return comp->function->upvalueCount++;
     }
 
@@ -737,10 +737,9 @@ private:
     }
 
 public:
-    Parser(const std::string& source, Compiler& compiler, Obj* objects1) : compiler(&compiler) {
+    Parser(const std::string& source, Compiler& compiler, Object*& objects) : compiler(&compiler), objects(objects) {
         current_char = source.begin();
         end_char = source.end();
-        objects = objects1;
     }
 
     Function* compile() {
@@ -758,7 +757,7 @@ public:
     }
 };
 
-Function* compile(const std::string& source, Obj* objects) {
+Function* compile(const std::string& source, Object*& objects) {
     Compiler compiler(nullptr, TYPE_SCRIPT, objects);
     Parser parser(source, compiler, objects);
     return parser.compile();

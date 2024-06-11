@@ -22,22 +22,21 @@ private:
     std::vector<CallFrame> frames;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
-    ObjUpvalue* openUpvalues = nullptr;
-    Obj* objects = nullptr;
+    Upvalue* openUpvalues = nullptr;
+    Object* objects = nullptr;
 
     bool clockNative(int argCount, Value* args);
     bool readNumberNative(int argCount, Value* args);
 
     void runtimeError(const std::string& format);
-    void defineNative(const std::string& name, NativeFn function, Obj* objects);
-    void freeObjects();
+    void defineNative(std::string name, NativeFn function);
 
     void push(Value value);
     Value pop();
     Value peek(int distance);
-    bool call(Closure& closure, int argCount);
+    bool call(Closure* closure, int argCount);
     bool callValue(Value callee, int argCount);
-    ObjUpvalue* captureUpvalue(Value* local);
+    Upvalue* captureUpvalue(Value* local);
     void closeUpvalues(Value* last);
 
     uint8_t readByte();

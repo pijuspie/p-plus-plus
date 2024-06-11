@@ -1,58 +1,77 @@
-#ifndef value_h
-#define value_h
+#ifndef value2_h
+#define value2_h
 
 #include <string>
 #include <vector>
 
-typedef struct Value Value;
-typedef struct ObjUpvalue ObjUpvalue;
 typedef struct VM VM;
+typedef struct String String;
+typedef struct Function Function;
+typedef struct Native Native;
+typedef struct Closure Closure;
 
-enum ValueType {
-    VAL_NIL,
-    VAL_BOOL,
-    VAL_NUMBER,
-    VAL_STRING,
-    VAL_FUNCTION,
-    VAL_NATIVE,
-    VAL_CLOSURE,
-    VAL_UPVALUE,
+enum class ObjectType {
+    string,
+    function,
+    native,
+    upvalue,
+    closure,
 };
 
-struct Obj {
+struct Object {
+    ObjectType type;
+    Object* next;
+};
+
+enum class ValueType {
+    nil,
+    boolean,
+    number,
+    object,
+};
+
+struct Value {
     ValueType type;
-    Obj* next;
-    Obj(ValueType type, Obj* next);
+    union {
+        bool boolean;
+        double number;
+        Object* object;
+    } as;
+
+    Value();
+    Value(bool boolean);
+    Value(double number);
+    Value(String* string);
+    Value(Function* function);
+    Value(Native* native);
+    Value(Closure* closure);
+
+    String* getString();
+    Function* getFunction();
+    Native* getNative();
+    Closure* getClosure();
+
+    std::string stringify();
 };
 
-typedef bool (VM::* NativeFn)(int argCount, Value* args);
-
-struct Native {
-    Obj obj;
-    NativeFn function;
-    Native(NativeFn function, Obj* next);
+struct String {
+    Object object;
+    std::string chars;
 };
-
-Native& getNative(Value value);
-
-struct ObjString {
-    Obj obj;
-    std::string string;
-    ObjString(const std::string& string, Obj* next);
-};
-
-ObjString& getObjString(Value value);
-std::string& getString(Value value);
 
 enum OpCode {
-    OP_CALL,
-    OP_CLOSURE,
-    OP_CLOSE_UPVALUE,
-    OP_RETURN,
     OP_CONSTANT,
     OP_NIL,
     OP_TRUE,
     OP_FALSE,
+    OP_POP,
+    OP_GET_LOCAL,
+    OP_SET_LOCAL,
+    OP_GET_GLOBAL,
+    OP_DEFINE_GLOBAL,
+    OP_SET_GLOBAL,
+    OP_GET_UPVALUE,
+    OP_SET_UPVALUE,
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
@@ -66,17 +85,13 @@ enum OpCode {
     OP_JUMP,
     OP_JUMP_IF_FALSE,
     OP_LOOP,
-    OP_POP,
-    OP_DEFINE_GLOBAL,
-    OP_GET_LOCAL,
-    OP_SET_LOCAL,
-    OP_GET_GLOBAL,
-    OP_SET_GLOBAL,
-    OP_GET_UPVALUE,
-    OP_SET_UPVALUE,
+    OP_CALL,
+    OP_CLOSURE,
+    OP_CLOSE_UPVALUE,
+    OP_RETURN,
 };
 
-std::string getOpCode(OpCode opCode);
+std::string stringifyOpCode(OpCode opCode);
 
 struct Chunk {
     std::vector<uint8_t> code;
@@ -85,50 +100,37 @@ struct Chunk {
 };
 
 struct Function {
-    Obj obj;
-    int arity = 0;
-    int upvalueCount = 0;
-    Chunk chunk;
+    Object object;
     std::string name;
-    Function(Obj* next);
+    int arity;
+    int upvalueCount;
+    Chunk chunk;
 };
 
-Function& getFunction(Value value);
+typedef bool (VM::* NativeFn)(int argCount, Value* args);
 
-struct Closure {
-    Obj obj;
-    Function* function;
-    std::vector<ObjUpvalue*> upvalues;
-    Closure(Function* function, Obj* obj);
+struct Native {
+    Object object;
+    NativeFn function;
 };
 
-Closure& getClosure(Value value);
-
-struct Value {
-    ValueType type;
-    union {
-        bool boolean;
-        double number;
-        Obj* object;
-    } as;
-
-    Value();
-    Value(bool boolean);
-    Value(double number);
-    Value(ObjString& string);
-    Value(Function& function);
-    Value(Native& native);
-    Value(Closure& closure);
-};
-
-std::string stringify(Value value);
-
-struct ObjUpvalue {
-    Obj obj;
+struct Upvalue {
+    Object object;
     Value* location;
     Value closed;
-    ObjUpvalue* next = nullptr;
-    ObjUpvalue(Value* location, Obj* obj, ObjUpvalue* next);
+    Upvalue* next;
 };
+
+struct Closure {
+    Object object;
+    Function* function;
+    std::vector<Upvalue*> upvalues;
+};
+
+String* newString(std::string& chars, Object*& next);
+Function* newFunction(std::string& name, Object*& next);
+Native* newNative(NativeFn function, Object*& next);
+Upvalue* newUpvalue(Value* location, Upvalue* next, Object*& objects);
+Closure* newClosure(Function* function, Object*& next);
 
 #endif

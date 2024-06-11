@@ -13,10 +13,10 @@ struct Local {
     Local(Token name, int depth);
 };
 
-struct Upvalue {
+struct OpenUpvalue {
     uint8_t index;
     bool isLocal;
-    Upvalue(bool isLocal, uint8_t index);
+    OpenUpvalue(bool isLocal, uint8_t index);
 };
 
 enum FunctionType {
@@ -30,12 +30,12 @@ struct Compiler {
     FunctionType type;
 
     std::vector<Local> locals;
-    std::vector<Upvalue> upvalues;
+    std::vector<OpenUpvalue> upvalues;
     int scopeDepth = 0;
 
-    Compiler(Compiler* enclosing, FunctionType type, Obj* objects);
+    Compiler(Compiler* enclosing, FunctionType type, Object*& objects);
 };
 
-Function* compile(const std::string& source, Obj* objects);
+Function* compile(const std::string& source, Object*& objects);
 
 #endif 

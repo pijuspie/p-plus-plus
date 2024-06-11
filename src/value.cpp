@@ -1,142 +1,150 @@
 #include "value.h"
-#include <iostream>
 
-Obj::Obj(ValueType type1, Obj* next1) {
-    type = type1;
-    next = next1;
+Value::Value() {
+    type = ValueType::nil;
 }
-
-Native::Native(NativeFn function1, Obj* next) : obj(Obj(VAL_NATIVE, next)) {
-    function = function1;
-}
-
-Native& getNative(Value value) {
-    return *(Native*)value.as.object;
-}
-
-ObjString::ObjString(const std::string& string1, Obj* next) : obj(Obj(VAL_STRING, next)) {
-    string = string1;
-}
-
-ObjString& getObjString(Value value) {
-    return *(ObjString*)value.as.object;
-}
-
-std::string& getString(Value value) {
-    return getObjString(value).string;
-}
-
-ObjUpvalue::ObjUpvalue(Value* location, Obj* obj, ObjUpvalue* next) : obj(Obj(VAL_UPVALUE, obj)), location(location), next(next) {};
-
-std::string getOpCode(OpCode opCode) {
-    switch (opCode) {
-    case OP_CALL: return "OP_CALL";
-    case OP_CLOSURE: return "OP_CLOSURE";
-    case OP_RETURN: return "OP_RETURN";
-    case OP_CLOSE_UPVALUE: return "OP_CLOSE_UPVALUE";
-    case OP_CONSTANT: return "OP_CONSTANT";
-    case OP_NIL: return "OP_NIL";
-    case OP_TRUE: return "OP_TRUE";
-    case OP_FALSE: return "OP_FALSE";
-    case OP_EQUAL: return "OP_EQUAL";
-    case OP_GREATER: return "OP_GREATER";
-    case OP_LESS: return "OP_LESS";
-    case OP_ADD: return "OP_ADD";
-    case OP_SUBTRACT: return "OP_SUBTRACT";
-    case OP_MULTIPLY: return "OP_MULTIPLY";
-    case OP_DIVIDE: return "OP_DIVIDE";
-    case OP_NOT: return "OP_NOT";
-    case OP_NEGATE: return "OP_NEGATE";
-    case OP_PRINT: return "OP_PRINT";
-    case OP_JUMP: return "OP_JUMP";
-    case OP_JUMP_IF_FALSE: return "OP_JUMP_IF_FALSE";
-    case OP_LOOP: return "OP_LOOP";
-    case OP_POP: return "OP_POP";
-    case OP_DEFINE_GLOBAL: return "OP_DEFINE_GLOBAL";
-    case OP_GET_LOCAL: return "OP_GET_LOCAL";
-    case OP_SET_LOCAL: return "OP_SET_LOCAL";
-    case OP_GET_GLOBAL: return "OP_GET_GLOBAL";
-    case OP_SET_GLOBAL: return "OP_SET_GLOBAL";
-    case OP_GET_UPVALUE: return "OP_GET_UPVALUE";
-    case OP_SET_UPVALUE: return "OP_SET_UPVALUE";
-    default:
-        return "Unexpected code: " + std::to_string(opCode);
-    }
-}
-
-Function::Function(Obj* next) : obj(Obj(VAL_FUNCTION, next)) {}
-
-Function& getFunction(Value value) {
-    return *(Function*)value.as.object;
-}
-
-Closure::Closure(Function* function, Obj* next) : function(function), obj(Obj(VAL_CLOSURE, next)) {
-    upvalues.resize(function->upvalueCount, nullptr);
-};
-
-Closure& getClosure(Value value) {
-    return *(Closure*)value.as.object;
-}
-
-Value::Value() : type(VAL_NIL) {
-    as.number = 0;
-};
 
 Value::Value(bool boolean) {
-    type = VAL_BOOL;
+    type = ValueType::boolean;
     as.boolean = boolean;
 }
 
 Value::Value(double number) {
-    type = VAL_NUMBER;
+    type = ValueType::number;
     as.number = number;
 }
 
-Value::Value(ObjString& string) {
-    type = VAL_STRING;
-    as.object = (Obj*)&string;
+Value::Value(String* string) {
+    type = ValueType::object;
+    as.object = (Object*)string;
 }
 
-Value::Value(Function& function) {
-    type = VAL_FUNCTION;
-    as.object = (Obj*)&function;
+Value::Value(Function* function) {
+    type = ValueType::object;
+    as.object = (Object*)function;
 }
 
-Value::Value(Native& native) {
-    type = VAL_NATIVE;
-    as.object = (Obj*)&native;
+Value::Value(Native* native) {
+    type = ValueType::object;
+    as.object = (Object*)native;
 }
 
-Value::Value(Closure& closure) {
-    type = VAL_CLOSURE;
-    as.object = (Obj*)&closure;
+Value::Value(Closure* closure) {
+    type = ValueType::object;
+    as.object = (Object*)closure;
 }
 
-std::string stringify(Value value) {
-    switch (value.type) {
-    case VAL_NIL: return "nil";
-    case VAL_BOOL: return (value.as.boolean ? "true" : "false");
-    case VAL_NUMBER: return std::to_string(value.as.number);
-    case VAL_STRING: return getString(value);
-    case VAL_NATIVE: return "<native fn>";
-    case VAL_CLOSURE: {
-        Function& fn = *getClosure(value).function;
-        if (fn.name == "") {
-            return "<script>";
-        } else {
-            return "<fn " + fn.name + ">";
+String* Value::getString() { return (String*)as.object; }
+Function* Value::getFunction() { return (Function*)as.object; }
+Native* Value::getNative() { return (Native*)as.object; }
+Closure* Value::getClosure() { return (Closure*)as.object; }
+
+std::string Value::stringify() {
+    switch (type) {
+    case ValueType::nil: return "nil";
+    case ValueType::boolean: return (as.boolean ? "true" : "false");
+    case ValueType::number: return std::to_string(as.number);
+    case ValueType::object: {
+        switch (as.object->type) {
+        case ObjectType::string: return this->getString()->chars;
+        case ObjectType::native: return "<native fn>";
+        case ObjectType::closure: {
+            Function* fn = this->getClosure()->function;
+            if (fn->name == "") return "<script>";
+            else return "<fn " + fn->name + ">";
         }
-    };
-    case VAL_FUNCTION: {
-        Function& fn = getFunction(value);
-        if (fn.name == "") {
-            return "<script>";
-        } else {
-            return "<fn " + fn.name + ">";
+        case ObjectType::function: {
+            Function* fn = this->getFunction();
+            if (fn->name == "") return "<script>";
+            else return "<fn " + fn->name + ">";
+        }
+        case ObjectType::upvalue: return "upvalue";
         }
     }
-    case VAL_UPVALUE: return "upvalue";
     }
 
     return "unexpected type";
+}
+
+String* newString(std::string& chars, Object*& next) {
+    String* string = new String;
+    string->object.type = ObjectType::string;
+    string->object.next = next;
+    next = &string->object;
+    string->chars = chars;
+    return string;
+}
+
+std::string stringifyOpCode(OpCode opCode) {
+    switch (opCode) {
+    case OP_CONSTANT: return "CONSTANT";
+    case OP_NIL: return "NIL";
+    case OP_TRUE: return "TRUE";
+    case OP_FALSE: return "FALSE";
+    case OP_POP: return "POP";
+    case OP_GET_LOCAL: return "GET_LOCAL";
+    case OP_SET_LOCAL: return "SET_LOCAL";
+    case OP_GET_GLOBAL: return "GET_GLOBAL";
+    case OP_DEFINE_GLOBAL: return "DEFINE_GLOBAL";
+    case OP_SET_GLOBAL: return "SET_GLOBAL";
+    case OP_GET_UPVALUE: return "GET_UPVALUE";
+    case OP_SET_UPVALUE: return "SET_UPVALUE";
+    case OP_EQUAL: return "EQUAL";
+    case OP_GREATER: return "GREATER";
+    case OP_LESS: return "LESS";
+    case OP_ADD: return "ADD";
+    case OP_SUBTRACT: return "SUBTRACT";
+    case OP_MULTIPLY: return "MULTIPLY";
+    case OP_DIVIDE: return "DIVIDE";
+    case OP_NOT: return "NOT";
+    case OP_NEGATE: return "NEGATE";
+    case OP_PRINT: return "PRINT";
+    case OP_JUMP: return "JUMP";
+    case OP_JUMP_IF_FALSE: return "JUMP_IF_FALSE";
+    case OP_LOOP: return "LOOP";
+    case OP_CALL: return "CALL";
+    case OP_CLOSURE: return "CLOSURE";
+    case OP_CLOSE_UPVALUE: return "CLOSE_UPVALUE";
+    case OP_RETURN: return "RETURN";
+    default: return "Unexpected code: " + std::to_string(opCode);
+    }
+}
+
+Function* newFunction(std::string& name, Object*& next) {
+    Function* function = new Function;
+    function->object.type = ObjectType::function;
+    function->object.next = next;
+    next = &function->object;
+    function->name = name;
+    function->arity = 0;
+    function->upvalueCount = 0;
+    return function;
+}
+
+Native* newNative(NativeFn function, Object*& next) {
+    Native* native = new Native;
+    native->object.type = ObjectType::native;
+    native->object.next = next;
+    next = &native->object;
+    native->function = function;
+    return native;
+}
+
+Closure* newClosure(Function* function, Object*& next) {
+    Closure* closure = new Closure;
+    closure->object.type = ObjectType::closure;
+    closure->object.next = next;
+    next = &closure->object;
+    closure->function = function;
+    return closure;
+}
+
+Upvalue* newUpvalue(Value* location, Upvalue* next, Object*& objects) {
+    Upvalue* upvalue = new Upvalue;
+    upvalue->object.type = ObjectType::upvalue;
+    upvalue->object.next = objects;
+    objects = &upvalue->object;
+    upvalue->location = location;
+    upvalue->next = next;
+    return upvalue;
 }
