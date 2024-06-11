@@ -7,13 +7,12 @@ Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
 OpenUpvalue::OpenUpvalue(bool isLocal, uint8_t index) : isLocal(isLocal), index(index) {};
 
-Compiler::Compiler(Compiler* enclosing1, FunctionType type1, Object*& objects) {
+Compiler::Compiler(Compiler* enclosing1, Token token, FunctionType type1, GC& garbageCollector) : garbageCollector(garbageCollector) {
     enclosing = enclosing1;
     type = type1;
 
-    std::string name = "";
-    function = newFunction(name, objects);
-    Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
+    std::string name = std::string(token.start, token.end);
+    function = garbageCollector.newFunction(name);
     locals.push_back(Local(token, 0));
 }
 
@@ -43,7 +42,6 @@ struct ParseRule {
 
 class Parser {
 private:
-    Object*& objects;
     Compiler* compiler;
 
     int line = 1;
@@ -249,11 +247,14 @@ private:
     }
 
     void function(FunctionType type) {
-        Compiler current(compiler, type, objects);
-        compiler = &current;
+        std::string name = "";
+        Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
         if (type != TYPE_SCRIPT) {
-            compiler->function->name = std::string(previous.start, previous.end);
+            token = previous;
         }
+
+        Compiler current(compiler, token, type, compiler->garbageCollector);
+        compiler = &current;
 
         beginScope();
 
@@ -450,7 +451,7 @@ private:
         }
 
         std::string string2 = ss.str();
-        String* value = newString(string2, objects);
+        String* value = compiler->garbageCollector.newString(string2);
         emitConstant(Value(value));
     }
 
@@ -620,7 +621,7 @@ private:
 
     uint8_t identifierConstant(Token* name) {
         std::string string = std::string(previous.start, previous.end);
-        String* value = newString(string, objects);
+        String* value = compiler->garbageCollector.newString(string);
         return makeConstant(Value(value));
     }
 
@@ -737,7 +738,7 @@ private:
     }
 
 public:
-    Parser(const std::string& source, Compiler& compiler, Object*& objects) : compiler(&compiler), objects(objects) {
+    Parser(const std::string& source, Compiler& compiler) : compiler(&compiler) {
         current_char = source.begin();
         end_char = source.end();
     }
@@ -757,8 +758,10 @@ public:
     }
 };
 
-Function* compile(const std::string& source, Object*& objects) {
-    Compiler compiler(nullptr, TYPE_SCRIPT, objects);
-    Parser parser(source, compiler, objects);
+Function* compile(const std::string& source, GC& garbageCollector) {
+    std::string name = "";
+    Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
+    Compiler compiler(nullptr, token, TYPE_SCRIPT, garbageCollector);
+    Parser parser(source, compiler);
     return parser.compile();
 }

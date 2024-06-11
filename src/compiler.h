@@ -3,6 +3,7 @@
 
 #include "scanner.h"
 #include "value.h"
+#include "memory.h"
 #include <string>
 
 struct Local {
@@ -28,14 +29,15 @@ struct Compiler {
     Compiler* enclosing;
     Function* function;
     FunctionType type;
+    GC& garbageCollector;
 
     std::vector<Local> locals;
     std::vector<OpenUpvalue> upvalues;
     int scopeDepth = 0;
 
-    Compiler(Compiler* enclosing, FunctionType type, Object*& objects);
+    Compiler(Compiler* enclosing, Token name, FunctionType type, GC& garbageCollector);
 };
 
-Function* compile(const std::string& source, Object*& objects);
+Function* compile(const std::string& source, GC& garbageCollector);
 
 #endif 

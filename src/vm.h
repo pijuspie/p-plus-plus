@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_map>
 #include "value.h"
+#include "memory.h"
 
 enum class InterpretResult {
     ok, compileError, runtimeError
@@ -23,7 +24,7 @@ private:
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
     Upvalue* openUpvalues = nullptr;
-    Object* objects = nullptr;
+    GC garbageCollector;
 
     bool clockNative(int argCount, Value* args);
     bool readNumberNative(int argCount, Value* args);

@@ -2,7 +2,6 @@
 #include <time.h>
 #include "vm.h"
 #include "compiler.h"
-#include "memory.h"
 
 VM global;
 
@@ -73,9 +72,9 @@ void VM::runtimeError(const std::string& message) {
 }
 
 void VM::defineNative(std::string name, NativeFn function) {
-    String* string = newString(name, objects);
+    String* string = garbageCollector.newString(name);
     push(Value(string));
-    Native* native = newNative(function, objects);
+    Native* native = garbageCollector.newNative(function);
     push(Value(native));
 
     globals.insert({ stack[0].getString()->chars, stack[1] });
@@ -143,7 +142,7 @@ Upvalue* VM::captureUpvalue(Value* local) {
         return upvalue;
     }
 
-    Upvalue* createdUpvalue = newUpvalue(local, upvalue, objects);
+    Upvalue* createdUpvalue = garbageCollector.newUpvalue(local, upvalue);
 
     if (prevUpvalue == nullptr) {
         openUpvalues = createdUpvalue;
@@ -219,7 +218,7 @@ InterpretResult VM::run() {
         }
         case OP_CLOSURE: {
             Function* function = readConstant().getFunction();
-            Closure* closure = newClosure(function, objects);
+            Closure* closure = garbageCollector.newClosure(function);
             push(Value(closure));
             for (int i = 0; i < closure->upvalues.size(); i++) {
                 uint8_t isLocal = readByte();
@@ -292,7 +291,7 @@ InterpretResult VM::run() {
                 std::string& b = pop().getString()->chars;
                 std::string& a = pop().getString()->chars;
                 std::string c = a + b;
-                String* result = newString(c, objects);
+                String* result = garbageCollector.newString(c);
                 push(Value(result));
             } else if (peek(0).type == ValueType::number && peek(1).type == ValueType::number) {
                 push(pop().as.number + pop().as.number);
@@ -412,20 +411,20 @@ InterpretResult VM::run() {
 }
 
 InterpretResult VM::interpret(std::string& source) {
-    Function* fn = compile(source, objects);
+    Function* fn = compile(source, garbageCollector);
 
     if (fn == nullptr) {
         return InterpretResult::compileError;
     }
 
     stack.push_back(Value(fn));
-    Closure* closure = newClosure(fn, objects);
+    Closure* closure = garbageCollector.newClosure(fn);
     pop();
     push(Value(closure));
     call(closure, 0);
 
     InterpretResult result = run();
 
-    freeObjects(objects);
+    garbageCollector.freeObjects(); // print and delete
     return result;
 }

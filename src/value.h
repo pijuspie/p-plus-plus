@@ -127,10 +127,4 @@ struct Closure {
     std::vector<Upvalue*> upvalues;
 };
 
-String* newString(std::string& chars, Object*& next);
-Function* newFunction(std::string& name, Object*& next);
-Native* newNative(NativeFn function, Object*& next);
-Upvalue* newUpvalue(Value* location, Upvalue* next, Object*& objects);
-Closure* newClosure(Function* function, Object*& next);
-
 #endif

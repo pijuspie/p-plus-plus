@@ -66,15 +66,6 @@ std::string Value::stringify() {
     return "unexpected type";
 }
 
-String* newString(std::string& chars, Object*& next) {
-    String* string = new String;
-    string->object.type = ObjectType::string;
-    string->object.next = next;
-    next = &string->object;
-    string->chars = chars;
-    return string;
-}
-
 std::string stringifyOpCode(OpCode opCode) {
     switch (opCode) {
     case OP_CONSTANT: return "CONSTANT";
@@ -108,43 +99,4 @@ std::string stringifyOpCode(OpCode opCode) {
     case OP_RETURN: return "RETURN";
     default: return "Unexpected code: " + std::to_string(opCode);
     }
-}
-
-Function* newFunction(std::string& name, Object*& next) {
-    Function* function = new Function;
-    function->object.type = ObjectType::function;
-    function->object.next = next;
-    next = &function->object;
-    function->name = name;
-    function->arity = 0;
-    function->upvalueCount = 0;
-    return function;
-}
-
-Native* newNative(NativeFn function, Object*& next) {
-    Native* native = new Native;
-    native->object.type = ObjectType::native;
-    native->object.next = next;
-    next = &native->object;
-    native->function = function;
-    return native;
-}
-
-Closure* newClosure(Function* function, Object*& next) {
-    Closure* closure = new Closure;
-    closure->object.type = ObjectType::closure;
-    closure->object.next = next;
-    next = &closure->object;
-    closure->function = function;
-    return closure;
-}
-
-Upvalue* newUpvalue(Value* location, Upvalue* next, Object*& objects) {
-    Upvalue* upvalue = new Upvalue;
-    upvalue->object.type = ObjectType::upvalue;
-    upvalue->object.next = objects;
-    objects = &upvalue->object;
-    upvalue->location = location;
-    upvalue->next = next;
-    return upvalue;
 }
