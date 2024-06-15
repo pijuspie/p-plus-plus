@@ -53,7 +53,12 @@ TokenType identifierType(StringIterator start, StringIterator end) {
     case 'i': return checkKeyword(start + 1, end, "f", TOKEN_IF);
     case 'n': return checkKeyword(start + 1, end, "il", TOKEN_NIL);
     case 'o': return checkKeyword(start + 1, end, "r", TOKEN_OR);
-    case 'p': return checkKeyword(start + 1, end, "rint", TOKEN_PRINT);
+    case 'p': {
+        TokenType type = checkKeyword(start + 1, end, "rint", TOKEN_PRINT);
+        if (type != TOKEN_IDENTIFIER) return type;
+        type = checkKeyword(start + 1, end, "rintl", TOKEN_PRINTL);
+        return type;
+    }
     case 'r': return checkKeyword(start + 1, end, "eturn", TOKEN_RETURN);
     case 's': return checkKeyword(start + 1, end, "uper", TOKEN_SUPER);
     case 't':
@@ -126,6 +131,7 @@ Token character(StringIterator& current, StringIterator end, int line) {
     case '+': return Token(TOKEN_PLUS, start, current, line);
     case '/': return Token(TOKEN_SLASH, start, current, line);
     case '*': return Token(TOKEN_STAR, start, current, line);
+    case '%': return Token(TOKEN_PERCENT, start, current, line);
     case '!':
         if (current != end && current[0] == '=') {
             current++;

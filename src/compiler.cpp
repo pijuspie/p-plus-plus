@@ -201,6 +201,8 @@ private:
     void statement() {
         if (match(TOKEN_PRINT)) {
             printStatement();
+        } else if (match(TOKEN_PRINTL)) {
+            printLineStatement();
         } else if (match(TOKEN_IF)) {
             ifStatement();
         } else if (match(TOKEN_RETURN)) {
@@ -292,6 +294,12 @@ private:
         expression();
         consume(TOKEN_SEMICOLON, "Expect ';' after value.");
         emitByte(OP_PRINT);
+    }
+
+    void printLineStatement() {
+        expression();
+        consume(TOKEN_SEMICOLON, "Expect ';' after value.");
+        emitByte(OP_PRINTL);
     }
 
     void returnStatement() {
@@ -513,6 +521,7 @@ private:
         case TOKEN_MINUS: emitByte(OP_SUBTRACT); break;
         case TOKEN_STAR: emitByte(OP_MULTIPLY); break;
         case TOKEN_SLASH: emitByte(OP_DIVIDE); break;
+        case TOKEN_PERCENT: emitByte(OP_REMAIN); break;
         default: return;
         }
     }
@@ -536,7 +545,7 @@ private:
         consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
     }
 
-    ParseRule rules[40] = {
+    ParseRule rules[42] = {
         [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
@@ -548,6 +557,7 @@ private:
         [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
         [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
         [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
+        [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR},
         [TOKEN_BANG] = {unary, NULL, PREC_NONE},
         [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
         [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
@@ -569,6 +579,7 @@ private:
         [TOKEN_NIL] = {literal, NULL, PREC_NONE},
         [TOKEN_OR] = {NULL, or_, PREC_OR},
         [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
+        [TOKEN_PRINTL] = {NULL, NULL, PREC_NONE},
         [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
         [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
         [TOKEN_THIS] = {NULL, NULL, PREC_NONE},

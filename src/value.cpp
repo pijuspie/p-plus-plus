@@ -106,6 +106,7 @@ std::string stringifyOpCode(OpCode opCode) {
     case OP_NOT: return "NOT";
     case OP_NEGATE: return "NEGATE";
     case OP_PRINT: return "PRINT";
+    case OP_PRINTL: return "PRINTL";
     case OP_JUMP: return "JUMP";
     case OP_JUMP_IF_FALSE: return "JUMP_IF_FALSE";
     case OP_LOOP: return "LOOP";

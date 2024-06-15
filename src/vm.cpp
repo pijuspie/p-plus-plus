@@ -363,6 +363,19 @@ InterpretResult VM::run() {
             push(1 / pop().as.number * pop().as.number);
             break;
         }
+        case OP_REMAIN: {
+            if (peek(0).type != ValueType::number || peek(1).type != ValueType::number) {
+                runtimeError("Operands must be numbers.");
+                return InterpretResult::runtimeError;
+            }
+
+            Value b = pop();
+            Value a = pop();
+            double result = std::fmod(a.as.number, b.as.number);
+
+            push(Value(result));
+            break;
+        }
         case OP_NOT: {
             Value value = pop();
             push(isFalsey(value));
@@ -370,6 +383,10 @@ InterpretResult VM::run() {
         }
         case OP_PRINT: {
             std::cout << pop().stringify();
+            break;
+        }
+        case OP_PRINTL: {
+            std::cout << pop().stringify() << std::endl;
             break;
         }
         case OP_JUMP: {
