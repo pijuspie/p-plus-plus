@@ -50,7 +50,7 @@ struct Compiler {
 
 struct GC {
     size_t bytesAllocated = 0;
-    size_t nextGC = 50; //1024 * 1024;
+    size_t nextGC = 1024 * 1024;
     Object* objects = nullptr;
     std::vector<Object*> grayObjects;
 

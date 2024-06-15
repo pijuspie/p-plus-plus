@@ -132,10 +132,6 @@ void GC::collectGarbage() {
         std::cout << "-- gc end" << std::endl;
         std::cout << "   collected " << before - bytesAllocated << " bytes (from " << before << " to " << bytesAllocated << ") next at " << nextGC << std::endl;
     }
-
-    // if (before - bytesAllocated > 0) {
-    //     std::cout << "Collected " << before - bytesAllocated << " bytes" << std::endl;
-    // }
 }
 
 String* GC::newString(std::string& chars) {
