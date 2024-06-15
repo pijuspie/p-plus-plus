@@ -55,12 +55,18 @@ Value::Value(Instance* instance) {
     as.object = (Object*)instance;
 }
 
+Value::Value(BoundMethod* boundMethod) {
+    type = ValueType::object;
+    as.object = (Object*)boundMethod;
+}
+
 String* Value::getString() { return (String*)as.object; }
 Function* Value::getFunction() { return (Function*)as.object; }
 Native* Value::getNative() { return (Native*)as.object; }
 Closure* Value::getClosure() { return (Closure*)as.object; }
 Class* Value::getClass() { return (Class*)as.object; }
 Instance* Value::getInstance() { return (Instance*)as.object; }
+BoundMethod* Value::getBoundMethod() { return (BoundMethod*)as.object; }
 
 std::string Value::stringify() {
     switch (type) {
@@ -89,6 +95,11 @@ std::string Value::stringify() {
         case ObjectType::Upvalue: return "upvalue";
         case ObjectType::Class: return this->getClass()->name;
         case ObjectType::Instance: return this->getInstance()->klass->name + " instance";
+        case ObjectType::BoundMethod: {
+            Function* fn = this->getBoundMethod()->method->function;
+            if (fn->name == "") return "<script>";
+            else return "<fn " + fn->name + ">";
+        }
         }
     }
     }
@@ -127,9 +138,12 @@ std::string stringifyOpCode(OpCode opCode) {
     case OP_JUMP_IF_FALSE: return "JUMP_IF_FALSE";
     case OP_LOOP: return "LOOP";
     case OP_CALL: return "CALL";
+    case OP_INVOKE: return "INVOKE";
     case OP_CLOSURE: return "CLOSURE";
     case OP_CLOSE_UPVALUE: return "CLOSE_UPVALUE";
     case OP_RETURN: return "RETURN";
+    case OP_CLASS: return "CLASS";
+    case OP_METHOD: return "METHOD";
     default: return "Unexpected code: " + std::to_string(opCode);
     }
 }

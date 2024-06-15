@@ -32,6 +32,8 @@ struct OpenUpvalue {
 
 enum FunctionType {
     TYPE_FUNCTION,
+    TYPE_METHOD,
+    TYPE_INITIALIZER,
     TYPE_SCRIPT
 };
 
@@ -59,6 +61,7 @@ struct GC {
     std::unordered_map<std::string, Value>* globals;
     std::vector<CallFrame>* frames;
     Compiler* compiler = nullptr;
+    String** initString;
 
     void markObject(Object* object);
     void markValue(Value value);
@@ -75,6 +78,7 @@ struct GC {
     Closure* newClosure(Function* function);
     Class* newClass(std::string& name);
     Instance* newInstance(Class* klass);
+    BoundMethod* newBoundMethod(Value receiver, Closure* method);
     void freeObject(Object* object);
     void freeObjects();
 };

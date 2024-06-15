@@ -21,6 +21,10 @@ VM::VM() {
     garbageCollector.globals = &globals;
     garbageCollector.frames = &frames;
     garbageCollector.openUpvalues = &openUpvalues;
+    garbageCollector.initString = &initString;
+
+    std::string init = "init";
+    initString = garbageCollector.newString(init);
 
     stack.reserve(256);
     defineNative("clock", clockNative);
@@ -164,11 +168,65 @@ bool VM::callValue(Value callee, int argCount) {
     case ObjectType::Class: {
         Class* klass = callee.getClass();
         stack[stack.size() - argCount - 1] = Value(garbageCollector.newInstance(klass));
+        auto x = initString == nullptr ? klass->methods.end() : klass->methods.find(initString->chars);
+        if (x != klass->methods.end()) {
+            return call(x->second.getClosure(), argCount);
+        } else if (argCount != 0) {
+            runtimeError("Expected 0 arguments but got " + std::to_string(argCount) + ".");
+            return false;
+        }
         return true;
+    }
+    case ObjectType::BoundMethod: {
+        BoundMethod* bound = callee.getBoundMethod();
+        stack[stack.size() - argCount - 1] = bound->receiver;
+        return call(bound->method, argCount);
     }
     }
     runtimeError("Can only call functions and classes.");
     return false;
+}
+
+bool VM::invokeFromClass(Class* klass, String* name, int argCount) {
+    Value method;
+    auto x = klass->methods.find(name->chars);
+    if (x == klass->methods.end()) {
+        runtimeError("Undefined property '" + name->chars + "'.");
+        return false;
+    }
+    return call(x->second.getClosure(), argCount);
+}
+
+bool VM::invoke(String* name, int argCount) {
+    Value receiver = peek(argCount);
+
+    if (receiver.type != ValueType::object || receiver.as.object->type != ObjectType::Instance) {
+        runtimeError("Only instances have methods.");
+        return false;
+    }
+
+    Instance* instance = receiver.getInstance();
+
+    auto x = instance->fields.find(name->chars);
+    if (x != instance->fields.end()) {
+        stack[stack.size() - argCount - 1] = x->second;
+        return callValue(x->second, argCount);
+    }
+
+    return invokeFromClass(instance->klass, name, argCount);
+}
+
+bool VM::bindMethod(Class* klass, String* name) {
+    auto x = klass->methods.find(name->chars);
+    if (x == klass->methods.end()) {
+        runtimeError("Undefined property '" + name->chars + "'.");
+        return false;
+    }
+
+    BoundMethod* bound = garbageCollector.newBoundMethod(peek(0), x->second.getClosure());
+    pop();
+    push(Value(bound));
+    return true;
 }
 
 Upvalue* VM::captureUpvalue(Value* local) {
@@ -201,6 +259,20 @@ void VM::closeUpvalues(Value* last) {
         upvalue->location = &upvalue->closed;
         openUpvalues = upvalue->next;
     }
+}
+
+void VM::defineMethod(String* name) {
+    Value method = peek(0);
+    Class* klass = peek(1).getClass();
+    Table::iterator value = klass->methods.find(name->chars);
+
+    if (value != klass->methods.end()) {
+        value->second = method;
+    } else {
+        klass->methods.insert({ name->chars, method });
+    }
+
+    pop();
 }
 
 uint8_t VM::readByte() {
@@ -254,6 +326,15 @@ InterpretResult VM::run() {
                 return InterpretResult::runtimeError;
             }
 
+            frame = &frames[frames.size() - 1];
+            break;
+        }
+        case OP_INVOKE: {
+            String* method = readConstant().getString();
+            int argCount = readByte();
+            if (!invoke(method, argCount)) {
+                return InterpretResult::runtimeError;
+            }
             frame = &frames[frames.size() - 1];
             break;
         }
@@ -316,8 +397,10 @@ InterpretResult VM::run() {
                 break;
             }
 
-            runtimeError("Undefined property '" + name->chars + "'.");
-            return InterpretResult::runtimeError;
+            if (!bindMethod(instance->klass, name)) {
+                return InterpretResult::runtimeError;
+            }
+            break;
         }
         case OP_SET_PROPERTY: {
             if (peek(1).type != ValueType::object || peek(1).as.object->type != ObjectType::Instance) {
@@ -326,7 +409,16 @@ InterpretResult VM::run() {
             }
 
             Instance* instance = peek(1).getInstance();
-            instance->fields.insert({ readConstant().getString()->chars, peek(0) });
+
+            std::string name = readConstant().getString()->chars;
+            std::unordered_map<std::string, Value>::iterator x = instance->fields.find(name);
+
+            if (x != globals.end()) {
+                x->second = peek(0);
+            } else {
+                instance->fields.insert({ name, peek(0) });
+            }
+
             Value value = pop();
             pop();
             push(value);
@@ -499,6 +591,9 @@ InterpretResult VM::run() {
         case OP_CLASS:
             push(Value(garbageCollector.newClass(readConstant().getString()->chars)));
             break;
+        case OP_METHOD:
+            defineMethod(readConstant().getString());
+            break;
         }
     }
 }
@@ -520,5 +615,6 @@ InterpretResult VM::interpret(std::string& source) {
 }
 
 VM::~VM() {
+    initString = nullptr;
     garbageCollector.freeObjects();
 }

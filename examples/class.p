@@ -1,6 +1,18 @@
-class Pair {}
+class CoffeeMaker {
+  init(coffee) {
+    this.coffee = coffee;
+  }
 
-var pair = Pair();
-pair.first = 1;
-pair.second = 2;
-print pair.first + pair.second;
+  brew() {
+    print "Enjoy your cup of " + this.coffee + "\n";
+
+    // No reusing the grounds!
+    this.coffee = nil;
+  }
+}
+
+var maker = CoffeeMaker("coffee and chicory");
+var brew = maker.brew;
+brew();
+maker.coffee = "tea";
+brew();

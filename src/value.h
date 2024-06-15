@@ -13,6 +13,7 @@ typedef struct Closure Closure;
 typedef struct Upvalue Upvalue;
 typedef struct Class Class;
 typedef struct Instance Instance;
+typedef struct BoundMethod BoundMethod;
 
 enum class ObjectType {
     String,
@@ -22,6 +23,7 @@ enum class ObjectType {
     Closure,
     Class,
     Instance,
+    BoundMethod,
 };
 
 struct Object {
@@ -56,6 +58,7 @@ struct Value {
     Value(Upvalue* upvalue);
     Value(Class* klass);
     Value(Instance* instance);
+    Value(BoundMethod* instance);
 
     String* getString();
     Function* getFunction();
@@ -63,6 +66,7 @@ struct Value {
     Closure* getClosure();
     Class* getClass();
     Instance* getInstance();
+    BoundMethod* getBoundMethod();
 
     std::string stringify();
 };
@@ -105,10 +109,12 @@ enum OpCode {
     OP_JUMP_IF_FALSE,
     OP_LOOP,
     OP_CALL,
+    OP_INVOKE,
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
     OP_RETURN,
     OP_CLASS,
+    OP_METHOD,
 };
 
 std::string stringifyOpCode(OpCode opCode);
@@ -144,6 +150,7 @@ struct Upvalue {
 struct Class {
     Object object;
     std::string name;
+    Table methods;
 };
 
 struct Instance {
@@ -156,6 +163,12 @@ struct Closure {
     Object object;
     Function* function;
     std::vector<Upvalue*> upvalues;
+};
+
+struct BoundMethod {
+    Object object;
+    Value receiver;
+    Closure* method;
 };
 
 #endif

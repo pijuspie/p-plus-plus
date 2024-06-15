@@ -44,6 +44,10 @@ void GC::markRoots() {
         markObject((Object*)current->function);
         current = current->enclosing;
     }
+
+    if (*initString != nullptr) {
+        markObject((Object*)*initString);
+    }
 }
 
 void GC::blackenObject(Object* object) {
@@ -74,14 +78,25 @@ void GC::blackenObject(Object* object) {
     case ObjectType::Upvalue:
         markValue(((Upvalue*)object)->closed);
         break;
-    case ObjectType::Class:
+    case ObjectType::Class: {
+        Class* klass = (Class*)object;
+        for (auto method : klass->methods) {
+            markValue(method.second);
+        }
         break;
+    }
     case ObjectType::Instance: {
         Instance* instance = (Instance*)object;
         markObject((Object*)instance->klass);
         for (auto field : instance->fields) {
             markValue(field.second);
         }
+        break;
+    }
+    case ObjectType::BoundMethod: {
+        BoundMethod* bound = (BoundMethod*)object;
+        markValue(bound->receiver);
+        markObject((Object*)bound->method);
         break;
     }
     case ObjectType::Native:
@@ -244,6 +259,21 @@ Instance* GC::newInstance(Class* klass) {
     return instance;
 }
 
+BoundMethod* GC::newBoundMethod(Value receiver, Closure* method) {
+    collectGarbage();
+    bytesAllocated += sizeof(BoundMethod);
+    BoundMethod* boundMethod = new BoundMethod;
+    boundMethod->object.type = ObjectType::BoundMethod;
+    boundMethod->object.next = objects;
+    objects = &boundMethod->object;
+    boundMethod->receiver = receiver;
+    boundMethod->method = method;
+    if (debugAllocation) {
+        std::cout << boundMethod << " allocate for: `" << Value(boundMethod).stringify() << "`" << std::endl;
+    }
+    return boundMethod;
+}
+
 void GC::freeObject(Object* object) {
     switch (object->type) {
     case ObjectType::String: {
@@ -280,6 +310,11 @@ void GC::freeObject(Object* object) {
         bytesAllocated -= sizeof(Instance);
         if (debugAllocation) std::cout << object << " free for: " << Value((Instance*)object).stringify() << std::endl;
         delete (Instance*)object; break;
+    case ObjectType::BoundMethod: {
+        bytesAllocated -= sizeof(BoundMethod);
+        if (debugAllocation) std::cout << object << " free for: " << Value((BoundMethod*)object).stringify() << std::endl;
+        delete (BoundMethod*)object; break;
+    }
     }
     }
 }

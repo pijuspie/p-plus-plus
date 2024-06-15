@@ -3,6 +3,8 @@
 #include <iostream>
 #include <sstream>
 
+const std::string THIS = "this";
+
 Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
 OpenUpvalue::OpenUpvalue(bool isLocal, uint8_t index) : isLocal(isLocal), index(index) {};
@@ -11,10 +13,21 @@ Compiler::Compiler(Compiler* enclosing1, Token token, FunctionType type1, GC* ga
     enclosing = enclosing1;
     type = type1;
 
+
     std::string name = std::string(token.start, token.end);
     function = garbageCollector->newFunction(name);
+
+    if (type != TYPE_FUNCTION) {
+        token.start = THIS.begin();
+        token.end = THIS.end();
+    }
+
     locals.push_back(Local(token, 0));
 }
+
+struct ClassCompiler {
+    ClassCompiler* enclosing;
+};
 
 enum Precedence {
     PREC_NONE,
@@ -43,6 +56,7 @@ struct ParseRule {
 class Parser {
 private:
     Compiler* compiler;
+    ClassCompiler* classCompiler;
 
     int line = 1;
     StringIterator current_char;
@@ -182,14 +196,26 @@ private:
 
     void classDeclaration() {
         consume(TOKEN_IDENTIFIER, "Expect class name.");
+        Token className = previous;
         uint8_t nameConstant = identifierConstant(&previous);
         declareVariable();
 
         emitBytes(OP_CLASS, nameConstant);
         defineVariable(nameConstant);
 
+        ClassCompiler currentClass;
+        currentClass.enclosing = classCompiler;
+        classCompiler = &currentClass;
+
+        namedVariable(className, false);
         consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+        while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+            method();
+        }
         consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+        emitByte(OP_POP);
+
+        classCompiler = classCompiler->enclosing;
     }
 
     void funDeclaration() {
@@ -290,7 +316,11 @@ private:
         consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
         block();
 
-        emitByte(OP_NIL);
+        if (compiler->type == TYPE_INITIALIZER) {
+            emitBytes(OP_GET_LOCAL, 0);
+        } else {
+            emitByte(OP_NIL);
+        }
         emitByte(OP_RETURN);
 
         Function* fn = compiler->function;
@@ -302,6 +332,17 @@ private:
             emitByte(current.upvalues[i].isLocal ? 1 : 0);
             emitByte(current.upvalues[i].index);
         }
+    }
+
+    void method() {
+        consume(TOKEN_IDENTIFIER, "Expect method name.");
+        uint8_t constant = identifierConstant(&previous);
+        FunctionType type = TYPE_METHOD;
+        if (previous.end - previous.start == 4 && std::string(previous.start, previous.end) == "init") {
+            type = TYPE_INITIALIZER;
+        }
+        function(type);
+        emitBytes(OP_METHOD, constant);
     }
 
     void printStatement() {
@@ -322,9 +363,17 @@ private:
         }
 
         if (match(TOKEN_SEMICOLON)) {
-            emitByte(OP_NIL);
+            if (compiler->type == TYPE_INITIALIZER) {
+                emitBytes(OP_GET_LOCAL, 0);
+            } else {
+                emitByte(OP_NIL);
+            }
             emitByte(OP_RETURN);
         } else {
+            if (compiler->type == TYPE_INITIALIZER) {
+                error("Can't return a value from an initializer.");
+            }
+
             expression();
             consume(TOKEN_SEMICOLON, "Expect ';' after return value.");
             emitByte(OP_RETURN);
@@ -483,6 +532,15 @@ private:
         namedVariable(previous, canAssign);
     }
 
+    void this_(bool canAssign) {
+        if (classCompiler == nullptr) {
+            error("Can't use 'this' outside of a class.");
+            return;
+        }
+
+        variable(false);
+    }
+
     void namedVariable(Token name, bool canAssign) {
         uint8_t getOp, setOp;
         int arg = resolveLocal(compiler, &name);
@@ -552,6 +610,10 @@ private:
         if (canAssign && match(TOKEN_EQUAL)) {
             expression();
             emitBytes(OP_SET_PROPERTY, name);
+        } else if (match(TOKEN_LEFT_PAREN)) {
+            uint8_t argCount = argumentList();
+            emitBytes(OP_INVOKE, name);
+            emitByte(argCount);
         } else {
             emitBytes(OP_GET_PROPERTY, name);
         }
@@ -625,7 +687,7 @@ private:
         [TOKEN_PRINTL] = {NULL, NULL, PREC_NONE},
         [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
         [TOKEN_SUPER] = {NULL, NULL, PREC_NONE},
-        [TOKEN_THIS] = {NULL, NULL, PREC_NONE},
+        [TOKEN_THIS] = {this_, NULL, PREC_NONE},
         [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
         [TOKEN_VAR] = {NULL, NULL, PREC_NONE},
         [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
@@ -794,7 +856,7 @@ private:
     }
 
 public:
-    Parser(const std::string& source, Compiler& compiler) : compiler(&compiler) {
+    Parser(const std::string& source, Compiler& compiler) : compiler(&compiler), classCompiler(nullptr) {
         current_char = source.begin();
         end_char = source.end();
     }

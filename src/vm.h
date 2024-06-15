@@ -15,6 +15,7 @@ private:
     std::vector<CallFrame> frames;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
+    String* initString = nullptr;
     Upvalue* openUpvalues = nullptr;
     GC garbageCollector;
 
@@ -31,8 +32,12 @@ private:
     Value peek(int distance);
     bool call(Closure* closure, int argCount);
     bool callValue(Value callee, int argCount);
+    bool invokeFromClass(Class* klass, String* name, int argCount);
+    bool invoke(String* name, int argCount);
+    bool bindMethod(Class* klass, String* name);
     Upvalue* captureUpvalue(Value* local);
     void closeUpvalues(Value* last);
+    void defineMethod(String* name);
 
     uint8_t readByte();
     uint16_t readShort();
