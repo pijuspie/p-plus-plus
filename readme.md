@@ -64,10 +64,36 @@ fun sum(a, b, c) {
 var sum1 = 4 + sum(5, 6, 7);
 
 fun out(x, y) {
-    print x+" "+y;
+    printl x+" "+y;
 }
 
 out("Hello", "world!");
+```
+
+#### Classes
+
+```
+class myClass {
+    init(a, b) {
+        this.a = a;
+        this.b = b;
+    }
+
+    sum() {
+        return a+b;
+    }
+
+    sub() {
+       return a-b; 
+    }
+}
+
+var myInstance = myClass(10, 7);
+printl myInstance.sum();
+
+var sub = myInstance.sub();
+myInstance.a = 15;
+printl sub();
 ```
 
 #### Other
@@ -84,13 +110,13 @@ var x = readNumber();
 var k = 85.43899;
 var l = 100;
 for (var i = 0; i<9; i = i+1) {
-    print "k: " + stringify(round(k, l)) + "\n";
+    printl "k: " + stringify(round(k, l));
     l = l / 10;
 }
 
 var end = clock();
 print end-begin;
-print "Seconds";
+printl " seconds";
 ```
 
 ## Examples
@@ -117,4 +143,10 @@ Pi calculator:
 
 ```
 p++ examples/pi.p
+```
+
+Another example with classes:
+
+```
+p++ examples/class.p
 ```
