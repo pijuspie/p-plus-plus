@@ -21,6 +21,7 @@ private:
     bool clockNative(int argCount, Value* args);
     bool readNumberNative(int argCount, Value* args);
     bool stringifyNative(int argCount, Value* args);
+    bool roundNative(int argCount, Value* args);
 
     void runtimeError(const std::string& format);
     void defineNative(std::string name, NativeFn function);
@@ -38,8 +39,9 @@ private:
     Value readConstant();
     InterpretResult run();
 public:
-    InterpretResult interpret(std::string& source);
     VM();
+    InterpretResult interpret(std::string& source);
+    ~VM();
 };
 
 InterpretResult interpret(std::string& source);

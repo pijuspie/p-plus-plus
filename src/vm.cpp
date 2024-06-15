@@ -1,5 +1,6 @@
 #include <iostream>
 #include <time.h>
+#include <cmath>
 #include "vm.h"
 #include "compiler.h"
 
@@ -25,6 +26,7 @@ VM::VM() {
     defineNative("clock", clockNative);
     defineNative("readNumber", readNumberNative);
     defineNative("stringify", stringifyNative);
+    defineNative("round", roundNative);
 }
 
 bool VM::clockNative(int argCount, Value* args) {
@@ -66,6 +68,25 @@ bool VM::stringifyNative(int argCount, Value* args) {
     std::string chars = args[0].stringify();
     String* string = garbageCollector.newString(chars);
     push(Value(string));
+    return true;
+}
+
+bool VM::roundNative(int argCount, Value* args) {
+    if (argCount != 2) {
+        runtimeError("Expected 2 arguments but got " + std::to_string(argCount) + ".");
+        return false;
+    }
+
+    Value number = args[0];
+    Value precision = args[1];
+
+    if (number.type != ValueType::number || precision.type != ValueType::number) {
+        runtimeError("Arguments should be numbers.");
+        return false;
+    }
+
+    double result = std::round(number.as.number / precision.as.number) * precision.as.number;
+    push(Value(result));
     return true;
 }
 
@@ -438,8 +459,9 @@ InterpretResult VM::interpret(std::string& source) {
     push(Value(closure));
     call(closure, 0);
 
-    InterpretResult result = run();
+    return run();
+}
 
-    garbageCollector.freeObjects(); // 
-    return result;
+VM::~VM() {
+    garbageCollector.freeObjects();
 }

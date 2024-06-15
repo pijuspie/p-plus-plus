@@ -1,4 +1,5 @@
 #include "value.h"
+#include <sstream>
 
 Value::Value() {
     type = ValueType::nil;
@@ -53,7 +54,12 @@ std::string Value::stringify() {
     switch (type) {
     case ValueType::nil: return "nil";
     case ValueType::boolean: return (as.boolean ? "true" : "false");
-    case ValueType::number: return std::to_string(as.number);
+    case ValueType::number: {
+        std::stringstream string;
+        string.precision(15);
+        string << as.number;
+        return string.str();
+    }
     case ValueType::object: {
         switch (as.object->type) {
         case ObjectType::string: return this->getString()->chars;

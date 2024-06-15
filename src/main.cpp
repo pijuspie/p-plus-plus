@@ -10,7 +10,6 @@ void repl() {
         std::cout << "> ";
 
         if (!std::getline(std::cin, line)) {
-            std::cout << std::endl;
             break;
         }
 
@@ -25,7 +24,6 @@ int runFile(const char* path) {
         std::cerr << "Could not open file \"" << path << "\"." << std::endl;
         return 74;
     }
-
 
     std::stringstream buffer;
     buffer << file.rdbuf();
