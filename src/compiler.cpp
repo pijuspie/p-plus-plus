@@ -165,7 +165,9 @@ private:
     }
 
     void declaration() {
-        if (match(TOKEN_FUN)) {
+        if (match(TOKEN_CLASS)) {
+            classDeclaration();
+        } else if (match(TOKEN_FUN)) {
             funDeclaration();
         } else if (match(TOKEN_VAR)) {
             varDeclaration();
@@ -176,6 +178,18 @@ private:
         if (panicMode) {
             synchronize();
         }
+    }
+
+    void classDeclaration() {
+        consume(TOKEN_IDENTIFIER, "Expect class name.");
+        uint8_t nameConstant = identifierConstant(&previous);
+        declareVariable();
+
+        emitBytes(OP_CLASS, nameConstant);
+        defineVariable(nameConstant);
+
+        consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+        consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
     }
 
     void funDeclaration() {
@@ -531,6 +545,18 @@ private:
         emitBytes(OP_CALL, argCount);
     }
 
+    void dot(bool canAssign) {
+        consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+        uint8_t name = identifierConstant(&previous);
+
+        if (canAssign && match(TOKEN_EQUAL)) {
+            expression();
+            emitBytes(OP_SET_PROPERTY, name);
+        } else {
+            emitBytes(OP_GET_PROPERTY, name);
+        }
+    }
+
     void literal(bool canAssign) {
         switch (previous.type) {
         case TOKEN_FALSE: emitByte(OP_FALSE); break;
@@ -545,13 +571,30 @@ private:
         consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
     }
 
-    ParseRule rules[42] = {
+    // void array(bool canAssign) {
+    //     uint8_t itemCount = 0;
+    //     if (!check(TOKEN_RIGHT_BRACKET)) {
+    //         do {
+    //             expression();
+    //             if (itemCount == 255) {
+    //                 error("Can't have more than 255 items.");
+    //             }
+    //             itemCount++;
+    //         } while (match(TOKEN_COMMA));
+    //     }
+    //     consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+
+    // }
+
+    ParseRule rules[44] = {
         [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
         [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACKET] = {NULL, NULL, PREC_NONE},
+        [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
         [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
-        [TOKEN_DOT] = {NULL, NULL, PREC_NONE},
+        [TOKEN_DOT] = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS] = {unary, binary, PREC_TERM},
         [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
         [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},

@@ -73,6 +73,8 @@ struct GC {
     Native* newNative(NativeFn function);
     Upvalue* newUpvalue(Value* location, Upvalue* next);
     Closure* newClosure(Function* function);
+    Class* newClass(std::string& name);
+    Instance* newInstance(Class* klass);
     void freeObject(Object* object);
     void freeObjects();
 };

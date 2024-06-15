@@ -149,7 +149,7 @@ bool VM::callValue(Value callee, int argCount) {
     }
 
     switch (callee.as.object->type) {
-    case ObjectType::native: {
+    case ObjectType::Native: {
         NativeFn native = callee.getNative()->function;
         if (!(this->*native)(argCount, &stack[stack.size() - argCount])) {
             return false;
@@ -159,8 +159,13 @@ bool VM::callValue(Value callee, int argCount) {
         push(result);
         return true;
     }
-    case ObjectType::closure:
+    case ObjectType::Closure:
         return call(callee.getClosure(), argCount);
+    case ObjectType::Class: {
+        Class* klass = callee.getClass();
+        stack[stack.size() - argCount - 1] = Value(garbageCollector.newInstance(klass));
+        return true;
+    }
     }
     runtimeError("Can only call functions and classes.");
     return false;
@@ -223,8 +228,8 @@ bool valuesEqual(Value a, Value b) {
     case ValueType::number: return a.as.number == b.as.number;
     case ValueType::object: {
         switch (a.as.object->type) {
-        case ObjectType::string: return a.getString()->chars == b.getString()->chars;
-        case ObjectType::function: return a.getFunction()->name == b.getFunction()->name;
+        case ObjectType::String: return a.getString()->chars == b.getString()->chars;
+        case ObjectType::Function: return a.getFunction()->name == b.getFunction()->name;
         default: return false;
         }
     }
@@ -295,6 +300,38 @@ InterpretResult VM::run() {
         case OP_NIL: push(Value()); break;
         case OP_TRUE: push(true); break;
         case OP_FALSE: push(false); break;
+        case OP_GET_PROPERTY: {
+            if (peek(0).type != ValueType::object || peek(0).as.object->type != ObjectType::Instance) {
+                runtimeError("Only instances have properties.");
+                return InterpretResult::runtimeError;
+            }
+
+            Instance* instance = peek(0).getInstance();
+            String* name = readConstant().getString();
+
+            auto x = instance->fields.find(name->chars);
+            if (x != instance->fields.end()) {
+                pop();
+                push(x->second);
+                break;
+            }
+
+            runtimeError("Undefined property '" + name->chars + "'.");
+            return InterpretResult::runtimeError;
+        }
+        case OP_SET_PROPERTY: {
+            if (peek(1).type != ValueType::object || peek(1).as.object->type != ObjectType::Instance) {
+                runtimeError("Only instances have fields.");
+                return InterpretResult::runtimeError;
+            }
+
+            Instance* instance = peek(1).getInstance();
+            instance->fields.insert({ readConstant().getString()->chars, peek(0) });
+            Value value = pop();
+            pop();
+            push(value);
+            break;
+        }
         case OP_EQUAL: push(valuesEqual(pop(), pop())); break;
         case OP_GREATER: {
             if (peek(0).type != ValueType::number || peek(1).type != ValueType::number) {
@@ -322,8 +359,8 @@ InterpretResult VM::run() {
             push(-pop().as.number);
             break;
         case OP_ADD:
-            if (peek(0).type == ValueType::object && peek(0).as.object->type == ObjectType::string &&
-                peek(1).type == ValueType::object && peek(1).as.object->type == ObjectType::string) {
+            if (peek(0).type == ValueType::object && peek(0).as.object->type == ObjectType::String &&
+                peek(1).type == ValueType::object && peek(1).as.object->type == ObjectType::String) {
                 std::string& b = pop().getString()->chars;
                 std::string& a = pop().getString()->chars;
                 std::string c = a + b;
@@ -459,6 +496,9 @@ InterpretResult VM::run() {
             *frame->closure->upvalues[slot]->location = peek(0);
             break;
         }
+        case OP_CLASS:
+            push(Value(garbageCollector.newClass(readConstant().getString()->chars)));
+            break;
         }
     }
 }

@@ -45,10 +45,22 @@ Value::Value(Upvalue* upvalue) {
     as.object = (Object*)upvalue;
 }
 
+Value::Value(Class* klass) {
+    type = ValueType::object;
+    as.object = (Object*)klass;
+}
+
+Value::Value(Instance* instance) {
+    type = ValueType::object;
+    as.object = (Object*)instance;
+}
+
 String* Value::getString() { return (String*)as.object; }
 Function* Value::getFunction() { return (Function*)as.object; }
 Native* Value::getNative() { return (Native*)as.object; }
 Closure* Value::getClosure() { return (Closure*)as.object; }
+Class* Value::getClass() { return (Class*)as.object; }
+Instance* Value::getInstance() { return (Instance*)as.object; }
 
 std::string Value::stringify() {
     switch (type) {
@@ -62,19 +74,21 @@ std::string Value::stringify() {
     }
     case ValueType::object: {
         switch (as.object->type) {
-        case ObjectType::string: return this->getString()->chars;
-        case ObjectType::native: return "<native fn>";
-        case ObjectType::closure: {
+        case ObjectType::String: return this->getString()->chars;
+        case ObjectType::Native: return "<native fn>";
+        case ObjectType::Closure: {
             Function* fn = this->getClosure()->function;
             if (fn->name == "") return "<script>";
             else return "<fn " + fn->name + ">";
         }
-        case ObjectType::function: {
+        case ObjectType::Function: {
             Function* fn = this->getFunction();
             if (fn->name == "") return "[script]";
             else return "[fn " + fn->name + "]";
         }
-        case ObjectType::upvalue: return "upvalue";
+        case ObjectType::Upvalue: return "upvalue";
+        case ObjectType::Class: return this->getClass()->name;
+        case ObjectType::Instance: return this->getInstance()->klass->name + " instance";
         }
     }
     }
@@ -96,6 +110,8 @@ std::string stringifyOpCode(OpCode opCode) {
     case OP_SET_GLOBAL: return "SET_GLOBAL";
     case OP_GET_UPVALUE: return "GET_UPVALUE";
     case OP_SET_UPVALUE: return "SET_UPVALUE";
+    case OP_GET_PROPERTY: return "GET_PROPERTY";
+    case OP_SET_PROPERTY: return "SET_PROPERTY";
     case OP_EQUAL: return "EQUAL";
     case OP_GREATER: return "GREATER";
     case OP_LESS: return "LESS";

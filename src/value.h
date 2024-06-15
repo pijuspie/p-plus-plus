@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 typedef struct VM VM;
 typedef struct String String;
@@ -10,13 +11,17 @@ typedef struct Function Function;
 typedef struct Native Native;
 typedef struct Closure Closure;
 typedef struct Upvalue Upvalue;
+typedef struct Class Class;
+typedef struct Instance Instance;
 
 enum class ObjectType {
-    string,
-    function,
-    native,
-    upvalue,
-    closure,
+    String,
+    Function,
+    Native,
+    Upvalue,
+    Closure,
+    Class,
+    Instance,
 };
 
 struct Object {
@@ -49,14 +54,20 @@ struct Value {
     Value(Native* native);
     Value(Closure* closure);
     Value(Upvalue* upvalue);
+    Value(Class* klass);
+    Value(Instance* instance);
 
     String* getString();
     Function* getFunction();
     Native* getNative();
     Closure* getClosure();
+    Class* getClass();
+    Instance* getInstance();
 
     std::string stringify();
 };
+
+typedef std::unordered_map<std::string, Value> Table;
 
 struct String {
     Object object;
@@ -76,6 +87,8 @@ enum OpCode {
     OP_SET_GLOBAL,
     OP_GET_UPVALUE,
     OP_SET_UPVALUE,
+    OP_GET_PROPERTY,
+    OP_SET_PROPERTY,
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
@@ -95,6 +108,7 @@ enum OpCode {
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
     OP_RETURN,
+    OP_CLASS,
 };
 
 std::string stringifyOpCode(OpCode opCode);
@@ -125,6 +139,17 @@ struct Upvalue {
     Value* location;
     Value closed;
     Upvalue* next;
+};
+
+struct Class {
+    Object object;
+    std::string name;
+};
+
+struct Instance {
+    Object object;
+    Class* klass;
+    Table fields;
 };
 
 struct Closure {
