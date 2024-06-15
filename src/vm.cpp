@@ -16,6 +16,11 @@ InterpretResult interpret(std::string& source) {
 }
 
 VM::VM() {
+    garbageCollector.stack = &stack;
+    garbageCollector.globals = &globals;
+    garbageCollector.frames = &frames;
+    garbageCollector.openUpvalues = &openUpvalues;
+
     stack.reserve(256);
     defineNative("clock", clockNative);
     defineNative("readNumber", readNumberNative);
@@ -72,13 +77,10 @@ void VM::runtimeError(const std::string& message) {
 }
 
 void VM::defineNative(std::string name, NativeFn function) {
-    String* string = garbageCollector.newString(name);
-    push(Value(string));
     Native* native = garbageCollector.newNative(function);
     push(Value(native));
 
-    globals.insert({ stack[0].getString()->chars, stack[1] });
-    pop();
+    globals.insert({ name, stack[0] });
     pop();
 }
 
@@ -205,7 +207,7 @@ InterpretResult VM::run() {
 
     for (;;) {
         uint8_t instruction = readByte();
-        //std::cout << getOpCode(OpCode(instruction)) << std::endl;
+        //std::cout << stringifyOpCode(OpCode(instruction)) << std::endl;
         switch (instruction) {
         case OP_CALL: {
             int argCount = readByte();
@@ -220,13 +222,13 @@ InterpretResult VM::run() {
             Function* function = readConstant().getFunction();
             Closure* closure = garbageCollector.newClosure(function);
             push(Value(closure));
-            for (int i = 0; i < closure->upvalues.size(); i++) {
+            for (int i = 0; i < function->upvalueCount; i++) {
                 uint8_t isLocal = readByte();
                 uint8_t index = readByte();
                 if (isLocal) {
-                    closure->upvalues[i] = captureUpvalue(&stack[frame->slots + index]);
+                    closure->upvalues.push_back(captureUpvalue(&stack[frame->slots + index]));
                 } else {
-                    closure->upvalues[i] = frame->closure->upvalues[index];
+                    closure->upvalues.push_back(frame->closure->upvalues[index]);
                 }
             }
             break;
@@ -411,7 +413,7 @@ InterpretResult VM::run() {
 }
 
 InterpretResult VM::interpret(std::string& source) {
-    Function* fn = compile(source, garbageCollector);
+    Function* fn = compile(source, &garbageCollector);
 
     if (fn == nullptr) {
         return InterpretResult::compileError;

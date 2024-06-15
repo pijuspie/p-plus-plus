@@ -6,38 +6,7 @@
 #include "memory.h"
 #include <string>
 
-struct Local {
-    Token name;
-    bool isCaptured = false;
-    int depth;
 
-    Local(Token name, int depth);
-};
-
-struct OpenUpvalue {
-    uint8_t index;
-    bool isLocal;
-    OpenUpvalue(bool isLocal, uint8_t index);
-};
-
-enum FunctionType {
-    TYPE_FUNCTION,
-    TYPE_SCRIPT
-};
-
-struct Compiler {
-    Compiler* enclosing;
-    Function* function;
-    FunctionType type;
-    GC& garbageCollector;
-
-    std::vector<Local> locals;
-    std::vector<OpenUpvalue> upvalues;
-    int scopeDepth = 0;
-
-    Compiler(Compiler* enclosing, Token name, FunctionType type, GC& garbageCollector);
-};
-
-Function* compile(const std::string& source, GC& garbageCollector);
+Function* compile(const std::string& source, GC* garbageCollector);
 
 #endif 

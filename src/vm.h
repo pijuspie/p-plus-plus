@@ -10,14 +10,6 @@ enum class InterpretResult {
     ok, compileError, runtimeError
 };
 
-struct CallFrame {
-    Closure* closure;
-    std::vector<uint8_t>::iterator ip;
-    int slots;
-
-    CallFrame(Closure* closure, int slots);
-};
-
 class VM {
 private:
     std::vector<CallFrame> frames;

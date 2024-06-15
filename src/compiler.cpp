@@ -7,12 +7,12 @@ Local::Local(Token name, int depth) : name(name), depth(depth) {}
 
 OpenUpvalue::OpenUpvalue(bool isLocal, uint8_t index) : isLocal(isLocal), index(index) {};
 
-Compiler::Compiler(Compiler* enclosing1, Token token, FunctionType type1, GC& garbageCollector) : garbageCollector(garbageCollector) {
+Compiler::Compiler(Compiler* enclosing1, Token token, FunctionType type1, GC* garbageCollector) : garbageCollector(garbageCollector) {
     enclosing = enclosing1;
     type = type1;
 
     std::string name = std::string(token.start, token.end);
-    function = garbageCollector.newFunction(name);
+    function = garbageCollector->newFunction(name);
     locals.push_back(Local(token, 0));
 }
 
@@ -255,6 +255,7 @@ private:
 
         Compiler current(compiler, token, type, compiler->garbageCollector);
         compiler = &current;
+        compiler->garbageCollector->compiler = compiler;
 
         beginScope();
 
@@ -278,6 +279,7 @@ private:
 
         Function* fn = compiler->function;
         compiler = compiler->enclosing;
+        compiler->garbageCollector->compiler = compiler;
         emitBytes(OP_CLOSURE, makeConstant(Value(fn)));
 
         for (int i = 0; i < fn->upvalueCount; i++) {
@@ -451,7 +453,7 @@ private:
         }
 
         std::string string2 = ss.str();
-        String* value = compiler->garbageCollector.newString(string2);
+        String* value = compiler->garbageCollector->newString(string2);
         emitConstant(Value(value));
     }
 
@@ -621,7 +623,7 @@ private:
 
     uint8_t identifierConstant(Token* name) {
         std::string string = std::string(previous.start, previous.end);
-        String* value = compiler->garbageCollector.newString(string);
+        String* value = compiler->garbageCollector->newString(string);
         return makeConstant(Value(value));
     }
 
@@ -758,10 +760,14 @@ public:
     }
 };
 
-Function* compile(const std::string& source, GC& garbageCollector) {
+Function* compile(const std::string& source, GC* garbageCollector) {
     std::string name = "";
     Token token(TOKEN_IDENTIFIER, name.begin(), name.end(), 0);
     Compiler compiler(nullptr, token, TYPE_SCRIPT, garbageCollector);
+    garbageCollector->compiler = &compiler;
+
     Parser parser(source, compiler);
-    return parser.compile();
+    Function* fn = parser.compile();
+    garbageCollector->compiler = nullptr;
+    return fn;
 }

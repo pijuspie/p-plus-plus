@@ -9,6 +9,7 @@ typedef struct String String;
 typedef struct Function Function;
 typedef struct Native Native;
 typedef struct Closure Closure;
+typedef struct Upvalue Upvalue;
 
 enum class ObjectType {
     string,
@@ -20,6 +21,7 @@ enum class ObjectType {
 
 struct Object {
     ObjectType type;
+    bool isMarked = false;
     Object* next;
 };
 
@@ -41,10 +43,12 @@ struct Value {
     Value();
     Value(bool boolean);
     Value(double number);
+    Value(Object* object);
     Value(String* string);
     Value(Function* function);
     Value(Native* native);
     Value(Closure* closure);
+    Value(Upvalue* upvalue);
 
     String* getString();
     Function* getFunction();

@@ -14,6 +14,11 @@ Value::Value(double number) {
     as.number = number;
 }
 
+Value::Value(Object* object) {
+    type = ValueType::object;
+    as.object = object;
+}
+
 Value::Value(String* string) {
     type = ValueType::object;
     as.object = (Object*)string;
@@ -32,6 +37,11 @@ Value::Value(Native* native) {
 Value::Value(Closure* closure) {
     type = ValueType::object;
     as.object = (Object*)closure;
+}
+
+Value::Value(Upvalue* upvalue) {
+    type = ValueType::object;
+    as.object = (Object*)upvalue;
 }
 
 String* Value::getString() { return (String*)as.object; }
@@ -55,8 +65,8 @@ std::string Value::stringify() {
         }
         case ObjectType::function: {
             Function* fn = this->getFunction();
-            if (fn->name == "") return "<script>";
-            else return "<fn " + fn->name + ">";
+            if (fn->name == "") return "[script]";
+            else return "[fn " + fn->name + "]";
         }
         case ObjectType::upvalue: return "upvalue";
         }

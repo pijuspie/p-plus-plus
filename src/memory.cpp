@@ -4,14 +4,138 @@
 const bool debugAllocation = false;
 const bool debugGC = false;
 
+void GC::markObject(Object* object) {
+    if (object == nullptr) return;
+    if (object->isMarked) return;
+    if (debugGC) {
+        if (object->type == ObjectType::string) {
+            std::cout << object << " mark: `" << Value(object).stringify() << "`" << std::endl;
+        } else {
+            std::cout << object << " mark: " << Value(object).stringify() << std::endl;
+        }
+    }
+    object->isMarked = true;
+    grayObjects.push_back(object);
+}
+
+void GC::markValue(Value value) {
+    if (value.type == ValueType::object) markObject(value.as.object);
+}
+
+void GC::markRoots() {
+    for (Value slot : *stack) {
+        markValue(slot);
+    }
+
+    for (Upvalue* upvalue = *openUpvalues; upvalue != nullptr; upvalue = upvalue->next) {
+        markObject((Object*)upvalue);
+    }
+
+    for (auto global : *globals) {
+        markValue(global.second);
+    }
+
+    for (CallFrame frame : *frames) {
+        markObject((Object*)frame.closure);
+    }
+
+    Compiler* current = compiler;
+    while (current != nullptr) {
+        markObject((Object*)current->function);
+        current = current->enclosing;
+    }
+}
+
+void GC::blackenObject(Object* object) {
+    if (debugGC) {
+        if (object->type == ObjectType::string) {
+            std::cout << object << " blacken: `" << Value(object).stringify() << "`" << std::endl;
+        } else {
+            std::cout << object << " blacken: " << Value(object).stringify() << std::endl;
+        }
+    }
+
+    switch (object->type) {
+    case ObjectType::closure: {
+        Closure* closure = (Closure*)object;
+        markObject((Object*)closure->function);
+        for (Upvalue* upvalue : closure->upvalues) {
+            markObject((Object*)upvalue);
+        }
+        break;
+    }
+    case ObjectType::function: {
+        Function* function = (Function*)object;
+        for (Value constant : function->chunk.constants) {
+            markValue(constant);
+        }
+        break;
+    }
+    case ObjectType::upvalue:
+        markValue(((Upvalue*)object)->closed);
+        break;
+    case ObjectType::native:
+    case ObjectType::string:
+        break;
+
+    }
+}
+
+void GC::traceReferences() {
+    while (grayObjects.size() > 0) {
+        Object* object = grayObjects[grayObjects.size() - 1];
+        grayObjects.pop_back();
+        blackenObject(object);
+    }
+}
+
+void GC::sweep() {
+    Object* previous = nullptr;
+    Object* object = objects;
+    while (object != nullptr) {
+        if (object->isMarked) {
+            object->isMarked = false;
+            previous = object;
+            object = object->next;
+        } else {
+            Object* unreached = object;
+            object = object->next;
+            if (previous != nullptr) {
+                previous->next = object;
+            } else {
+                objects = object;
+            }
+
+            freeObject(unreached);
+        }
+    }
+}
+
 void GC::collectGarbage() {
     if (bytesAllocated < nextGC && !debugGC) {
         return;
     }
 
-    if (debugGC) std::cout << "collecting garbage" << std::endl;
+    if (debugGC) {
+        std::cout << std::endl << "-- gc begin" << std::endl;
+    }
 
+    size_t before = bytesAllocated;
 
+    markRoots();
+    traceReferences();
+    sweep();
+
+    nextGC = bytesAllocated * 2;
+
+    if (debugGC) {
+        std::cout << "-- gc end" << std::endl;
+        std::cout << "   collected " << before - bytesAllocated << " bytes (from " << before << " to " << bytesAllocated << ") next at " << nextGC << std::endl;
+    }
+
+    // if (before - bytesAllocated > 0) {
+    //     std::cout << "Collected " << before - bytesAllocated << " bytes" << std::endl;
+    // }
 }
 
 String* GC::newString(std::string& chars) {
@@ -23,7 +147,7 @@ String* GC::newString(std::string& chars) {
     objects = &string->object;
     string->chars = chars;
     if (debugAllocation) {
-        std::cout << "allocated string: `" << Value(string).stringify() << "`" << std::endl;
+        std::cout << string << " allocate for: `" << Value(string).stringify() << "`" << std::endl;
     }
     return string;
 }
@@ -39,7 +163,7 @@ Function* GC::newFunction(std::string& name) {
     function->arity = 0;
     function->upvalueCount = 0;
     if (debugAllocation) {
-        std::cout << "allocated function: " << Value(function).stringify() << std::endl;
+        std::cout << function << " allocate for: `" << Value(function).stringify() << "`" << std::endl;
     }
     return function;
 }
@@ -53,7 +177,7 @@ Native* GC::newNative(NativeFn function) {
     objects = &native->object;
     native->function = function;
     if (debugAllocation) {
-        std::cout << "allocated native: " << Value(native).stringify() << std::endl;
+        std::cout << native << " allocate for: `" << Value(native).stringify() << "`" << std::endl;
     }
     return native;
 }
@@ -67,7 +191,7 @@ Closure* GC::newClosure(Function* function) {
     objects = &closure->object;
     closure->function = function;
     if (debugAllocation) {
-        std::cout << "allocated closure: " << Value(closure).stringify() << std::endl;
+        std::cout << closure << " allocate for: `" << Value(closure).stringify() << "`" << std::endl;
     }
     return closure;
 }
@@ -82,9 +206,39 @@ Upvalue* GC::newUpvalue(Value* location, Upvalue* next) {
     upvalue->location = location;
     upvalue->next = next;
     if (debugAllocation) {
-        std::cout << "allocated upvalue: " << Value(upvalue).stringify() << std::endl;
+        std::cout << upvalue << " allocate for: `" << Value(upvalue).stringify() << "`" << std::endl;
     }
     return upvalue;
+}
+
+void GC::freeObject(Object* object) {
+    switch (object->type) {
+    case ObjectType::string: {
+        bytesAllocated -= sizeof(String);
+        if (debugAllocation) std::cout << object << " free for: " << Value((String*)object).stringify() << std::endl;
+        delete (String*)object; break;
+    }
+    case ObjectType::function: {
+        bytesAllocated -= sizeof(Function);
+        if (debugAllocation) std::cout << object << " free for: " << Value((Function*)object).stringify() << std::endl;
+        delete (Function*)object; break;
+    }
+    case ObjectType::native: {
+        bytesAllocated -= sizeof(Native);
+        if (debugAllocation) std::cout << object << " free for: " << Value((Native*)object).stringify() << std::endl;
+        delete (Native*)object; break;
+    }
+    case ObjectType::closure: {
+        bytesAllocated -= sizeof(Closure);
+        if (debugAllocation) std::cout << object << " free for: " << Value((Closure*)object).stringify() << std::endl;
+        delete (Closure*)object; break;
+    }
+    case ObjectType::upvalue: {
+        bytesAllocated -= sizeof(Upvalue);
+        if (debugAllocation) std::cout << object << " free for: " << Value((Upvalue*)object).stringify() << std::endl;
+        delete (Upvalue*)object; break;
+    }
+    }
 }
 
 void GC::freeObjects() {
@@ -94,30 +248,7 @@ void GC::freeObjects() {
 
     while (objects != nullptr) {
         Object* next = objects->next;
-
-        switch (objects->type) {
-        case ObjectType::string: {
-            if (debugAllocation) std::cout << "string: `" << Value((String*)objects).stringify() << "`" << std::endl;
-            delete (String*)objects; break;
-        }
-        case ObjectType::function: {
-            if (debugAllocation) std::cout << "function: " << Value((Function*)objects).stringify() << std::endl;
-            delete (Function*)objects; break;
-        }
-        case ObjectType::native: {
-            if (debugAllocation) std::cout << "native: " << Value((Native*)objects).stringify() << std::endl;
-            delete (Native*)objects; break;
-        }
-        case ObjectType::closure: {
-            if (debugAllocation) std::cout << "closure: " << Value((Closure*)objects).stringify() << std::endl;
-            delete (Closure*)objects; break;
-        }
-        case ObjectType::upvalue: {
-            if (debugAllocation) std::cout << "upvalue: " << Value((Upvalue*)objects).stringify() << std::endl;
-            delete (Upvalue*)objects; break;
-        }
-        }
-
+        freeObject(objects);
         objects = next;
     }
 }
