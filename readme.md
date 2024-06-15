@@ -1,5 +1,8 @@
 # P++ Programming Language
 
+This is an interpreter for my language called p++.
+It is written in c++. It has a Mark-Sweep Garbage Collector.  
+
 ## Usage
 
 Compile the interpreter:
@@ -12,7 +15,7 @@ p++
 ```
 Run a code file:
 ```
-p++ failo_pavadinimas.p
+p++ file_name.p
 ```
 
 ## Syntax
@@ -27,6 +30,7 @@ var a2 = true;
 
 a = a + 1;
 var d = a * b;
+var e = 123 % 11;
 ```
 
 #### Control Flow
@@ -77,6 +81,13 @@ print a;
 print "Number x:";
 var x = readNumber();
 
+var k = 85.43899;
+var l = 100;
+for (var i = 0; i<9; i = i+1) {
+    print "k: " + stringify(round(k, l)) + "\n";
+    l = l / 10;
+}
+
 var end = clock();
 print end-begin;
 print "Seconds";
@@ -100,4 +111,10 @@ The Fibonacci sequence (using recursion):
 
 ```
 p++ examples/fibonacci.p
+```
+
+Pi calculator:
+
+```
+p++ examples/pi.p
 ```
