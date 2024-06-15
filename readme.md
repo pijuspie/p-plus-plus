@@ -1,7 +1,8 @@
 # P++ Programming Language
 
 This is an interpreter for my language called p++.
-It is written in c++. It has a Mark-Sweep Garbage Collector.  
+It is written in c++. It has a Mark-Sweep Garbage Collector.
+More than 2500 lines of code.
 
 ## Usage
 
