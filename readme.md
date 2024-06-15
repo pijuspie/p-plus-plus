@@ -124,3 +124,7 @@ Pi calculator:
 ```
 p++ examples/pi.p
 ```
+
+## License
+
+Copyright © 2024, pijuspie
