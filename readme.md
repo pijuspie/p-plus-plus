@@ -98,6 +98,12 @@ printl sub();
 
 #### Other
 
+Native functions:
+* `clock()` - gives the elapsed time since the program started running, in seconds
+* `readNumber()` - reads user input, converts it to number and returns (returns zero if fails to do so)
+* `stringify(x)` - converts x to string
+* `round(x, y)` - rounds x value to the closest multiple of y
+
 ```
 var begin = clock();
 
@@ -150,3 +156,7 @@ Another example with classes:
 ```
 p++ examples/class.p
 ```
+
+## License
+
+Copyright © 2024, pijuspie
