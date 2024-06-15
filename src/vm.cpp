@@ -24,6 +24,7 @@ VM::VM() {
     stack.reserve(256);
     defineNative("clock", clockNative);
     defineNative("readNumber", readNumberNative);
+    defineNative("stringify", stringifyNative);
 }
 
 bool VM::clockNative(int argCount, Value* args) {
@@ -53,6 +54,18 @@ bool VM::readNumberNative(int argCount, Value* args) {
     }
 
     push(Value(d));
+    return true;
+}
+
+bool VM::stringifyNative(int argCount, Value* args) {
+    if (argCount != 1) {
+        runtimeError("Expected 1 arguments but got " + std::to_string(argCount) + ".");
+        return false;
+    }
+
+    std::string chars = args[0].stringify();
+    String* string = garbageCollector.newString(chars);
+    push(Value(string));
     return true;
 }
 
@@ -427,6 +440,6 @@ InterpretResult VM::interpret(std::string& source) {
 
     InterpretResult result = run();
 
-    garbageCollector.freeObjects(); // print and delete
+    garbageCollector.freeObjects(); // 
     return result;
 }

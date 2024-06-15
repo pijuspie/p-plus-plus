@@ -20,6 +20,7 @@ private:
 
     bool clockNative(int argCount, Value* args);
     bool readNumberNative(int argCount, Value* args);
+    bool stringifyNative(int argCount, Value* args);
 
     void runtimeError(const std::string& format);
     void defineNative(std::string name, NativeFn function);
