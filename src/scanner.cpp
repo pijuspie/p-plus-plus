@@ -127,6 +127,7 @@ Token character(StringIterator& current, StringIterator end, int line) {
     case '[': return Token(TOKEN_LEFT_BRACKET, start, current, line);
     case ']': return Token(TOKEN_RIGHT_BRACKET, start, current, line);
     case ';': return Token(TOKEN_SEMICOLON, start, current, line);
+    case ':': return Token(TOKEN_COLON, start, current, line);
     case ',': return Token(TOKEN_COMMA, start, current, line);
     case '.': return Token(TOKEN_DOT, start, current, line);
     case '-': return Token(TOKEN_MINUS, start, current, line);

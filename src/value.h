@@ -93,6 +93,8 @@ enum OpCode {
     OP_SET_UPVALUE,
     OP_GET_PROPERTY,
     OP_SET_PROPERTY,
+    OP_GET_PROPERTY_BY_KEY,
+    OP_SET_PROPERTY_BY_KEY,
     OP_EQUAL,
     OP_GREATER,
     OP_LESS,
@@ -110,11 +112,15 @@ enum OpCode {
     OP_LOOP,
     OP_CALL,
     OP_INVOKE,
+    OP_INVOKE_BY_KEY,
     OP_CLOSURE,
     OP_CLOSE_UPVALUE,
     OP_RETURN,
     OP_CLASS,
     OP_METHOD,
+    OP_ARRAY,
+    OP_MAP,
+    OP_KEY,
 };
 
 std::string stringifyOpCode(OpCode opCode);

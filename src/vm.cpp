@@ -187,19 +187,22 @@ bool VM::callValue(Value callee, int argCount) {
     return false;
 }
 
-bool VM::invokeFromClass(Class* klass, String* name, int argCount) {
+bool VM::invokeFromClass(Class* klass, std::string name, int argCount) {
     Value method;
-    auto x = klass->methods.find(name->chars);
+    if (klass == nullptr) {
+        runtimeError("Undefined property '" + name + "'.");
+        return false;
+    }
+
+    auto x = klass->methods.find(name);
     if (x == klass->methods.end()) {
-        runtimeError("Undefined property '" + name->chars + "'.");
+        runtimeError("Undefined property '" + name + "'.");
         return false;
     }
     return call(x->second.getClosure(), argCount);
 }
 
-bool VM::invoke(String* name, int argCount) {
-    Value receiver = peek(argCount);
-
+bool VM::invoke(Value receiver, std::string name, int argCount) {
     if (receiver.type != ValueType::object || receiver.as.object->type != ObjectType::Instance) {
         runtimeError("Only instances have methods.");
         return false;
@@ -207,7 +210,7 @@ bool VM::invoke(String* name, int argCount) {
 
     Instance* instance = receiver.getInstance();
 
-    auto x = instance->fields.find(name->chars);
+    auto x = instance->fields.find(name);
     if (x != instance->fields.end()) {
         stack[stack.size() - argCount - 1] = x->second;
         return callValue(x->second, argCount);
@@ -216,10 +219,15 @@ bool VM::invoke(String* name, int argCount) {
     return invokeFromClass(instance->klass, name, argCount);
 }
 
-bool VM::bindMethod(Class* klass, String* name) {
-    auto x = klass->methods.find(name->chars);
+bool VM::bindMethod(Class* klass, std::string name) {
+    if (klass == nullptr) {
+        runtimeError("Undefined property '" + name + "'.");
+        return false;
+    }
+
+    auto x = klass->methods.find(name);
     if (x == klass->methods.end()) {
-        runtimeError("Undefined property '" + name->chars + "'.");
+        runtimeError("Undefined property '" + name + "'.");
         return false;
     }
 
@@ -332,9 +340,36 @@ InterpretResult VM::run() {
         case OP_INVOKE: {
             String* method = readConstant().getString();
             int argCount = readByte();
-            if (!invoke(method, argCount)) {
+            Value receiver = peek(argCount);
+            if (!invoke(receiver, method->chars, argCount)) {
                 return InterpretResult::runtimeError;
             }
+            frame = &frames[frames.size() - 1];
+            break;
+        }
+        case OP_INVOKE_BY_KEY: {
+            int argCount = readByte();
+            Value method = peek(argCount);
+            std::string name;
+
+            if (method.type == ValueType::number) {
+                name = method.stringify();
+            } else if (method.type == ValueType::object && method.as.object->type == ObjectType::String) {
+                name = method.stringify();
+            } else {
+                runtimeError("A key must be a number or a string.");
+                return InterpretResult::runtimeError;
+            }
+
+            Value receiver = peek(argCount + 1);
+            if (!invoke(receiver, name, argCount)) {
+                return InterpretResult::runtimeError;
+            }
+
+            Value value = pop();
+            pop();
+            push(value);
+
             frame = &frames[frames.size() - 1];
             break;
         }
@@ -397,7 +432,7 @@ InterpretResult VM::run() {
                 break;
             }
 
-            if (!bindMethod(instance->klass, name)) {
+            if (!bindMethod(instance->klass, name->chars)) {
                 return InterpretResult::runtimeError;
             }
             break;
@@ -420,6 +455,69 @@ InterpretResult VM::run() {
             }
 
             Value value = pop();
+            pop();
+            push(value);
+            break;
+        }
+        case OP_GET_PROPERTY_BY_KEY: {
+            if (peek(1).type != ValueType::object || peek(1).as.object->type != ObjectType::Instance) {
+                runtimeError("Only instances have properties.");
+                return InterpretResult::runtimeError;
+            }
+
+            Instance* instance = peek(1).getInstance();
+            std::string name;
+
+            if (peek(0).type == ValueType::number) {
+                name = peek(0).stringify();
+            } else if (peek(0).type == ValueType::object && peek(0).as.object->type == ObjectType::String) {
+                name = peek(0).stringify();
+            } else {
+                runtimeError("A key must be a number or a string.");
+                return InterpretResult::runtimeError;
+            }
+            pop();
+
+            auto x = instance->fields.find(name);
+            if (x != instance->fields.end()) {
+                pop();
+                push(x->second);
+                break;
+            }
+
+            if (!bindMethod(instance->klass, name)) {
+                return InterpretResult::runtimeError;
+            }
+            break;
+        }
+        case OP_SET_PROPERTY_BY_KEY: {
+            if (peek(2).type != ValueType::object || peek(2).as.object->type != ObjectType::Instance) {
+                runtimeError("Only instances have fields.");
+                return InterpretResult::runtimeError;
+            }
+
+            Instance* instance = peek(2).getInstance();
+            std::string name;
+
+            if (peek(1).type == ValueType::number) {
+                name = peek(1).stringify();
+            } else if (peek(1).type == ValueType::object && peek(1).as.object->type == ObjectType::String) {
+                name = peek(1).stringify();
+            } else {
+                runtimeError("A key must be a number or a string.");
+                return InterpretResult::runtimeError;
+            }
+
+            std::unordered_map<std::string, Value>::iterator x = instance->fields.find(name);
+
+            if (x != globals.end()) {
+                x->second = peek(0);
+            } else {
+                instance->fields.insert({ name, peek(0) });
+            }
+
+            Value value = pop();
+            pop();
             pop();
             push(value);
             break;
@@ -594,6 +692,28 @@ InterpretResult VM::run() {
         case OP_METHOD:
             defineMethod(readConstant().getString());
             break;
+        case OP_ARRAY: {
+            int itemCount = readByte();
+            Instance* instance = garbageCollector.newInstance(nullptr);
+            for (int i = itemCount - 1; i >= 0; i--) {
+                instance->fields.insert({ std::to_string(i), pop() });
+            }
+            push(Value(instance));
+            break;
+        }
+        case OP_MAP: {
+            Instance* instance = garbageCollector.newInstance(nullptr);
+            push(Value(instance));
+            break;
+        }
+        case OP_KEY: {
+            Value value = pop();
+            Value instance = pop();
+            std::string key = readConstant().getString()->chars;
+            instance.getInstance()->fields.insert({ key, value });
+            push(instance);
+            break;
+        }
         }
     }
 }

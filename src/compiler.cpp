@@ -619,6 +619,22 @@ private:
         }
     }
 
+    void field(bool canAssign) {
+        expression();
+        consume(TOKEN_RIGHT_BRACKET, "Expect ']' after a key.");
+
+        if (canAssign && match(TOKEN_EQUAL)) {
+            expression();
+            emitByte(OP_SET_PROPERTY_BY_KEY);
+        } else if (match(TOKEN_LEFT_PAREN)) {
+            uint8_t argCount = argumentList();
+            emitByte(OP_INVOKE_BY_KEY);
+            emitByte(argCount);
+        } else {
+            emitByte(OP_GET_PROPERTY_BY_KEY);
+        }
+    }
+
     void literal(bool canAssign) {
         switch (previous.type) {
         case TOKEN_FALSE: emitByte(OP_FALSE); break;
@@ -633,33 +649,55 @@ private:
         consume(TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
     }
 
-    // void array(bool canAssign) {
-    //     uint8_t itemCount = 0;
-    //     if (!check(TOKEN_RIGHT_BRACKET)) {
-    //         do {
-    //             expression();
-    //             if (itemCount == 255) {
-    //                 error("Can't have more than 255 items.");
-    //             }
-    //             itemCount++;
-    //         } while (match(TOKEN_COMMA));
-    //     }
-    //     consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+    void arrayLiteral(bool canAssign) {
+        uint8_t itemCount = 0;
+        if (!check(TOKEN_RIGHT_BRACKET)) {
+            do {
+                expression();
+                if (itemCount == 255) {
+                    error("Can't have more than 255 items.");
+                }
+                itemCount++;
+            } while (match(TOKEN_COMMA));
+        }
+        consume(TOKEN_RIGHT_BRACKET, "Expect ']' after items.");
+        emitBytes(OP_ARRAY, itemCount);
+    }
 
-    // }
+    void mapLiteral(bool canAssign) {
+        emitByte(OP_MAP);
 
-    ParseRule rules[44] = {
+        if (!check(TOKEN_RIGHT_BRACE)) {
+            do {
+                if (check(TOKEN_NUMBER)) {
+                    consume(TOKEN_NUMBER, "A key should be a number or an identifier.");
+                } else {
+                    consume(TOKEN_IDENTIFIER, "A key should be a number or an identifier.");
+                }
+                std::string key = std::string(previous.start, previous.end);
+
+                String* value = compiler->garbageCollector->newString(key);
+                consume(TOKEN_COLON, "Expect ':' after a key.");
+                expression();
+                emitBytes(OP_KEY, makeConstant(Value(value)));
+            } while (match(TOKEN_COMMA));
+        }
+        consume(TOKEN_RIGHT_BRACE, "Expect '}' after items.");
+    }
+
+    ParseRule rules[45] = {
         [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
         [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
-        [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACE] = {mapLiteral, NULL, PREC_NONE},
         [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
-        [TOKEN_LEFT_BRACKET] = {NULL, NULL, PREC_NONE},
+        [TOKEN_LEFT_BRACKET] = {arrayLiteral, field, PREC_CALL},
         [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
         [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
         [TOKEN_DOT] = {NULL, dot, PREC_CALL},
         [TOKEN_MINUS] = {unary, binary, PREC_TERM},
         [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
         [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
+        [TOKEN_COLON] = {NULL, NULL, PREC_NONE},
         [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
         [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
         [TOKEN_PERCENT] = {NULL, binary, PREC_FACTOR},

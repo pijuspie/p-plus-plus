@@ -32,9 +32,9 @@ private:
     Value peek(int distance);
     bool call(Closure* closure, int argCount);
     bool callValue(Value callee, int argCount);
-    bool invokeFromClass(Class* klass, String* name, int argCount);
-    bool invoke(String* name, int argCount);
-    bool bindMethod(Class* klass, String* name);
+    bool invokeFromClass(Class* klass, std::string name, int argCount);
+    bool invoke(Value receiver, std::string name, int argCount);
+    bool bindMethod(Class* klass, std::string name);
     Upvalue* captureUpvalue(Value* local);
     void closeUpvalues(Value* last);
     void defineMethod(String* name);
