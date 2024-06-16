@@ -71,6 +71,21 @@ fun out(x, y) {
 out("Hello", "world!");
 ```
 
+#### Objects
+
+```
+// initialization
+var a = [2, 3, 5, "example", false, nil];
+var b = {0: 2, 1: 3, 2: 5, name: "example", property: false};
+
+// access
+printl a[0];
+printl a["0"]; // equal to a[0]
+printl b[0];
+printl b["name"];
+printl b.name; // equal to b["name"]
+```
+
 #### Classes
 
 ```
@@ -90,7 +105,7 @@ class myClass {
 }
 
 var myInstance = myClass(10, 7);
-printl myInstance.sum();
+printl myInstance.sum(); // equal to myInstance["sum"]()
 
 var sub = myInstance.sub();
 myInstance.a = 15;
